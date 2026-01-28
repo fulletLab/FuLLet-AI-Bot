@@ -58,8 +58,7 @@ class QueueManager:
             jobs.append(job)
             
             start_wait = time.time()
-            max_batch = int(os.getenv("MAX_BATCH_SIZE", "4")) #esto lo puedes cambiar en el env a 2 para mas estabilidad
-                                                              #changed to 2 in the .env file for more stability
+            max_batch = int(os.getenv("MAX_BATCH_SIZE", "2"))
             while len(jobs) < max_batch:
                 remaining = 2.0 - (time.time() - start_wait)
                 if remaining <= 0:

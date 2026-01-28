@@ -1,149 +1,95 @@
 # FuLLetLabs - Image Generation Bot
 
-Professional Discord bot for AI image generation, modularized using Cogs and integrated with ComfyUI.
+Professional Discord bot for AI image generation, modularized using Cogs and integrated with ComfyUI. This version features high-efficiency Workflow Merging (Real Batching) and autonomous Multi-GPU scaling.
+
+## New High-Efficiency Features
+- **Workflow Merging (Real Batching)**: Uses the custom `CLIPTextEncodeBatch` node to process up to 4 prompts in a single sampler pass.
+- **Multi-GPU Scaling**: Automatically spawns one worker loop per GPU URL defined in configuration.
+- **User Fairness**: Implements a 2-job limit per user and round-robin prioritization within batches.
+- **VRAM Tuning**: Safety-first batching with configurable `MAX_BATCH_SIZE` (optimized for 8GB cards).
+- **Persistence**: Enhanced session recovery via name-based channel search if the database record is missing.
 
 ## Features
 - **Modular Architecture**: Built with Discord Cogs (Admin, Sessions, ImageCommands).
-- **Multi-Model Support**: Selection between Flux (Schnell) and Z-Image (Turbo).
-- **Dynamic Queue Feedback**: Real-time position (e.g., Pos: 3) and countdown (Queue: 3, 2, 1).
+- **Multi-Model Support**: Seamlessly switch between Flux (Schnell) and Z-Image (Turbo).
+- **Dynamic Queue Feedback**: Real-time position tracking and generation countdowns.
 - **Generation Metrics**: Automatic reporting of processing time per image.
-- **Private Sessions**: Automatic creation and auto-deletion (30 min) of user channels.
+- **Private Sessions**: Automatic creation and auto-management of dedicated user channels.
 - **Security**: Server ID protection, API Key authorization, and local port binding.
 
 ## How It Works
 
-The bot acts as a lightweight client that connects to ComfyUI via HTTP. This architecture allows you to:
-- Run the bot on any cheap server (no GPU required)
-- Use ComfyUI locally on your own machine with GPU
-- Rent cloud GPUs (RunPod, Vast.ai) and connect remotely
+The bot operates a multi-worker engine that connects to one or more ComfyUI instances via HTTP. It acts as a lightweight client that manages the queue and dynamic workflow construction.
 
 ```mermaid
-graph LR
-    A[Discord User] -->|/imagine command| B[Discord Bot]
-    B -->|HTTP Request| C{ComfyUI Instance}
-    C -->|Option 1| D[Local GPU<br/>127.0.0.1:8188]
-    C -->|Option 2| E[Cloud GPU<br/>RunPod/Vast.ai]
-    C -->|Option 3| F[Workspace<br/>Replicate/etc]
-    D -->|Generated Image| B
-    E -->|Generated Image| B
-    F -->|Generated Image| B
-    B -->|Send Image| A
-    B <-->|Store Sessions| G[(Database)]
-    G -->|SQLite| H[Local File]
-    G -->|PostgreSQL| I[Cloud DB<br/>Aiven/Railway]
+graph TD
+    A[Discord Users] -->|Prompts| B[QueueManager]
+    B -->|Fairness Filter| C{Worker Pool}
+    C -->|Worker 1| D[GPU 1: Batch 1]
+    C -->|Worker N| E[GPU N: Batch N]
+    D -->|Real Batching| F[ComfyUI Instance]
+    E -->|Real Batching| F
+    F -->|Generated Images| G[Result Distribution]
+    G -->|Direct Message| A
 ```
+
+Architecture flexibility:
+- Run the bot on any server (GPU not required for the bot itself).
+- Connect to local GPUs or remote cloud providers (RunPod, Vast.ai, Lambda).
+- Scale by adding more URLs to the configuration.
 
 ## Structure
 - `/modules/discord/bot.py`: Main bot loader and worker engine.
 - `/modules/discord/cogs/`: Core features (Admin, Sessions, Commands).
-- `/modules/ai/`: ComfyUI API integration and workflow logic.
-- `/modules/queue_manager/`: Priority queue and job management.
+- `/modules/ai/`: ComfyUI API integration and dynamic workflow construction.
+- `/modules/queue_manager/`: Priority queue, fairness enforcement, and parallel workers.
 - `/modules/utils/`: Database (SQLAlchemy) and image sanitization.
+- `/comfy_custom_nodes/`: Required custom nodes for the ComfyUI server.
 
 ## Prerequisites
-Before running this bot, you must have ComfyUI installed and configured:
-1. Install ComfyUI locally or subscribe to a cloud workspace service.
-2. Install the GGUF nodes in your ComfyUI installation (required for model loading).
-3. Ensure ComfyUI is accessible via HTTP and you have configured API key authentication.
+1. **ComfyUI**: Must be installed and accessible via HTTP.
+2. **GGUF Nodes**: Required for loading Flux models.
+3. **FuLLet Custom Node**: Copy `comfy_custom_nodes/batch_conditioning.py` to your `ComfyUI/custom_nodes/` folder and restart.
+4. **Database**: SQLite (default) or any PostgreSQL service.
 
 ## Configuration
-1. Define environment variables in `.env`:
-   ```env
-   DISCORD_TOKEN=your_token
-   ALLOWED_GUILD_ID=your_server_id
-   COMFY_URL=http://127.0.0.1:8188
-   COMFY_API_KEY=your_secret_key
-   DATABASE_URL=postgresql://avnadmin:tu_contraseña@tu-proyecto.aivencloud.com:12345/defaultdb?sslmode=require
-   ```
-   For `COMFY_URL`: Use `http://127.0.0.1:8188` if running ComfyUI locally. If using a cloud workspace or rented GPU, replace with the provided URL (e.g., `https://your-workspace.example.com`).
-   
-   **Database Configuration**:
-   - Add `DATABASE_URL=` to your `.env` file.
-   - Leave it empty to use local SQLite (`database/bot_data.db`) - recommended for development.
-   - For production or cloud deployments, use an external database with the following format:
-     ```env
-     DATABASE_URL=postgresql://username:password@hostname:port/database_name
-     ```
-   - Example (Aiven PostgreSQL):
-     ```env
-     DATABASE_URL=postgresql://avnadmin:your_password@your-project.aivencloud.com:12345/defaultdb?sslmode=require
-     ```
-   - Supported providers: Aiven, Railway, Render, Heroku, or any PostgreSQL/MySQL service.
-   - Important: Ensure your database URL includes SSL parameters if required by your provider (e.g., `?sslmode=require`).
-
-   **Multi-GPU Configuration (Optional)**:
-   To use multiple GPUs, add these variables to your `.env` file:
-   ```env
-   # Comma-separated list of ComfyUI URLs
-   COMFY_URLS=http://gpu1:8188,http://gpu2:8188
-   
-   # Comma-separated VRAM size in GB for each GPU (must handle same order as URLs)
-   GPU_VRAM_GB=24,16
-   
-   # Minimum free VRAM required to accept a job (default: 4)
-   MIN_FREE_VRAM=4
-   ```
-
-## Smart VRAM Scheduling
-
-The bot includes an intelligent scheduler that manages multiple GPUs efficiently:
-
-```mermaid
-graph TD
-    A[New Request] --> B{Check Free VRAM}
-    B -->|"VRAM >= 4GB"| C[Process on Current GPU]
-    B -->|"VRAM < 4GB"| D{Large Model?}
-    D -->|"Model > Free VRAM"| E{Other GPU Available?}
-    D -->|"Model <= VRAM"| C
-    E -->|Yes| F[Send to Other GPU]
-    E -->|No| G[Queue and Wait]
-    C --> H[Update Used VRAM]
-    F --> H
-    F --> H
+Define your environment variables in `.env`:
+```env
+DISCORD_TOKEN=your_token
+ALLOWED_GUILD_ID=your_server_id
+COMFY_URLS=http://gpu1:8188,http://gpu2:8188
+COMFY_API_KEY=your_secret_key
+DATABASE_URL=postgresql://user:pass@host:port/db
+MAX_BATCH_SIZE=2
 ```
 
-> [!WARNING]
-> **VRAM System Limitations**:
-> This system relies on **manual estimation** based on your `.env` configuration.
-> - It does NOT detect real-time VRAM usage.
-> - It does NOT monitor CPU load or system RAM.
-> - Incorrect configuration may lead to Out-Of-Memory (OOM) errors.
-> - Conservative values are recommended (leave a safety margin).
+### Detailed Setup
 
-2. Workflow Setup (`/flujos`):
-   To avoid errors, open the JSON files in the `/flujos` directory and ensure the following fields match your ComfyUI model names:
-   - `unet_name`: Rename to your specific diffusion model filename.
-   - `clip_name`: Rename to your specific CLIP model filename.
-   Alternatively, you can simply import your own flows by exporting them from ComfyUI in API format and replacing these files.
+**1. GPU Configuration**:
+- `COMFY_URLS`: Comma-separated list of your ComfyUI endpoints. The bot starts one parallel worker per URL.
+- `MAX_BATCH_SIZE`: Number of images per batch. 
+    - 2: Recommended for 8GB VRAM cards (Flux).
+    - 4: Recommended for 24GB+ VRAM cards.
 
-3. Install dependencies: `pip install -r requirements.txt`
-4. Launch application: `python app.py`
+**2. Database Configuration**:
+- `DATABASE_URL`: Leave empty to use local SQLite (`database/bot_data.db`).
+- Format for PostgreSQL (Aiven, Railway, etc.):
+  `postgresql://username:password@hostname:port/database_name?sslmode=require`
+
+**3. Workflow Setup (`/flujos`)**:
+The bot builds workflows dynamically, but you must ensure the model names in your ComfyUI server match the ones in the `.json` templates:
+- `unet_name`: Your GGUF model filename.
+- `clip_name`: Your CLIP GGUF filename.
 
 ## Commands
 - `/imagine [model] [prompt]`: Generate image with selected model.
 - `/edit [prompt] [image]`: Edit images (Flux-only optimized).
-- `!sync`: (Admin) Synchronize slash commands in #admin-tools.
-- `!clearall`: (Admin) Clear global and local command cache.
+- `!sync`: (Admin) Synchronize slash commands.
+- `!clearall`: (Admin) Clear command cache.
+- `!getid`: (Admin) Get current Server ID.
 
 ## Security Best Practices
-Follow these recommendations to protect your deployment:
-
-1. **Environment Variables Protection**:
-   - Never share your `DISCORD_TOKEN` or `COMFY_API_KEY` publicly.
-   - Regenerate tokens immediately if accidentally exposed.
-
-2. **Server Restriction**:
-   - Use `ALLOWED_GUILD_ID` to restrict the bot to your specific Discord server.
-   - Avoid running the bot on public or untrusted servers.
-
-3. **ComfyUI Security**:
-   - If running ComfyUI locally, do not expose port 8188 to the internet without proper firewall rules.
-   - Always use a strong `COMFY_API_KEY` for authentication.
-   - If using a cloud workspace, ensure it requires authentication and uses HTTPS.
-
-4. **Database Security**:
-   - The `database/` folder is excluded from Git by default. Keep it private.
-   - Regularly backup your database if storing important user data.
-
-5. **Dependencies**:
-   - Keep dependencies updated with `pip install --upgrade -r requirements.txt` to patch security vulnerabilities.
+1. **Token Protection**: Never share your secrets publicly.
+2. **Server Restriction**: Use `ALLOWED_GUILD_ID` to restrict bot access.
+3. **Firewall**: Ensure ComfyUI API is protected by API Key and preferably used over a secure tunnel.
+4. **Data Privacy**: The `database/` folder is git-ignored by default. Keep it private.

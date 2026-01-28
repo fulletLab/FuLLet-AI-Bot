@@ -30,13 +30,14 @@ class CLIPTextEncodeBatch:
     CATEGORY = "conditioning_batch"
 
     def encode(self, clip, text_1, text_2, text_3="", text_4=""):
-        texts = [t for t in [text_1, text_2, text_3, text_4] if t.strip()]
+        texts = [text_1, text_2, text_3, text_4]
+        
         conds = []
         pooleds = []
         num_tokens = []
         
         for text in texts:
-            tokens = clip.tokenize(text)
+            tokens = clip.tokenize(text if text else "")
             cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
             conds.append(cond)
             pooleds.append(pooled)
