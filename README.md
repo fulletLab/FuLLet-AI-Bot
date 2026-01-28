@@ -17,14 +17,22 @@ Professional Discord bot for AI image generation, modularized using Cogs and int
 - `/modules/queue_manager/`: Priority queue and job management.
 - `/modules/utils/`: Database (SQLAlchemy) and image sanitization.
 
+## Prerequisites
+Before running this bot, you must have ComfyUI installed and configured:
+1. Install ComfyUI locally or subscribe to a cloud workspace service.
+2. Install the GGUF nodes in your ComfyUI installation (required for model loading).
+3. Ensure ComfyUI is accessible via HTTP and you have configured API key authentication.
+
 ## Configuration
 1. Define environment variables in `.env`:
    ```env
    DISCORD_TOKEN=your_token
    ALLOWED_GUILD_ID=your_server_id
-   COMFY_URL=http://your-ip:8188
+   COMFY_URL=http://127.0.0.1:8188
    COMFY_API_KEY=your_secret_key
    ```
+   For `COMFY_URL`: Use `http://127.0.0.1:8188` if running ComfyUI locally. If using a cloud workspace or rented GPU, replace with the provided URL (e.g., `https://your-workspace.example.com`).
+   
 2. Workflow Setup (`/flujos`):
    To avoid errors, open the JSON files in the `/flujos` directory and ensure the following fields match your ComfyUI model names:
    - `unet_name`: Rename to your specific diffusion model filename.
@@ -61,14 +69,22 @@ Bot profesional de Discord para generación de imágenes por IA, modularizado me
 - `/modules/queue_manager/`: Gestión de colas de prioridad.
 - `/modules/utils/`: Base de datos (SQLAlchemy) y filtrado de imágenes.
 
+## Requisitos Previos
+Antes de ejecutar este bot, debes tener ComfyUI instalado y configurado:
+1. Instala ComfyUI localmente o contrata un espacio de trabajo en la nube.
+2. Instala los nodos GGUF en tu instalación de ComfyUI (requerido para cargar modelos).
+3. Asegúrate de que ComfyUI sea accesible vía HTTP y hayas configurado autenticación por API Key.
+
 ## Configuración
 1. Definir variables en `.env`:
    ```env
    DISCORD_TOKEN=tu_token
    ALLOWED_GUILD_ID=tu_id_de_servidor
-   COMFY_URL=http://tu-ip:8188
+   COMFY_URL=http://127.0.0.1:8188
    COMFY_API_KEY=tu_llave_secreta
    ```
+   Para `COMFY_URL`: Usa `http://127.0.0.1:8188` si ejecutas ComfyUI localmente. Si usas un espacio de trabajo en la nube o GPU rentada, reemplázala con la URL proporcionada (ej: `https://tu-espacio.ejemplo.com`).
+
 2. Configuración de Flujos (`/flujos`):
    Para evitar errores, abre los archivos JSON en la carpeta `/flujos` y asegúrate de que los siguientes campos coincidan con los nombres de tus modelos en ComfyUI:
    - `unet_name`: Cambiar por el nombre de tu archivo de modelo de difusión.
