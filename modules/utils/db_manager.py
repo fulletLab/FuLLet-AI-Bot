@@ -9,6 +9,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 if not DATABASE_URL:
     DB_PATH = "sqlite:///database/bot_data.db"
 else:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     DB_PATH = DATABASE_URL
 
 class Base(DeclarativeBase):
