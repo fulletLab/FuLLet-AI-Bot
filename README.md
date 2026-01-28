@@ -53,6 +53,7 @@ Before running this bot, you must have ComfyUI installed and configured:
    ALLOWED_GUILD_ID=your_server_id
    COMFY_URL=http://127.0.0.1:8188
    COMFY_API_KEY=your_secret_key
+   DATABASE_URL=postgresql://avnadmin:tu_contraseña@tu-proyecto.aivencloud.com:12345/defaultdb?sslmode=require
    ```
    For `COMFY_URL`: Use `http://127.0.0.1:8188` if running ComfyUI locally. If using a cloud workspace or rented GPU, replace with the provided URL (e.g., `https://your-workspace.example.com`).
    
@@ -165,6 +166,7 @@ Antes de ejecutar este bot, debes tener ComfyUI instalado y configurado:
    ALLOWED_GUILD_ID=tu_id_de_servidor
    COMFY_URL=http://127.0.0.1:8188
    COMFY_API_KEY=tu_llave_secreta
+   DATABASE_URL=postgresql://avnadmin:tu_contraseña@tu-proyecto.aivencloud.com:12345/defaultdb?sslmode=require
    ```
    Para `COMFY_URL`: Usa `http://127.0.0.1:8188` si ejecutas ComfyUI localmente. Si usas un espacio de trabajo en la nube o GPU rentada, reemplázala con la URL proporcionada (ej: `https://tu-espacio.ejemplo.com`).
 
