@@ -17,7 +17,7 @@ class CLIPTextEncodeBatch:
         return {
             "required": {
                 "clip": ("CLIP", ),
-                "batch_size": ("INT", {"default": 1, "min": 1, "max": 4}),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
                 "text_1": ("STRING", {"multiline": True}),
                 "text_2": ("STRING", {"multiline": True}),
                 "text_3": ("STRING", {"multiline": True}),
@@ -28,17 +28,20 @@ class CLIPTextEncodeBatch:
     FUNCTION = "encode"
     CATEGORY = "conditioning_batch"
 
-    def encode(self, clip, batch_size, text_1, text_2, text_3, text_4):
+    def encode(self, clip, batch_size, text_1, text_2, text_3="", text_4=""):
         all_texts = [text_1, text_2, text_3, text_4]
-        texts = all_texts[:batch_size]
+        target_size = max(1, batch_size)
+        texts = all_texts[:target_size]
         
+        while len(texts) < target_size:
+            texts.append("")
+            
         conds = []
         pooleds = []
         num_tokens = []
         
         for text in texts:
-            safe_text = text if text and text.strip() else ""
-            tokens = clip.tokenize(safe_text)
+            tokens = clip.tokenize(text if text is not None else "")
             cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
             conds.append(cond)
             pooleds.append(pooled)
@@ -52,17 +55,40 @@ class CLIPTextEncodeBatch:
         lcm_val = get_lcm_list(num_tokens)
         final_conds = []
         for cond, num in zip(conds, num_tokens):
-            repeat = lcm_val // num
+            repeat = lcm_val // num if num > 0 else 1
             final_conds.append(cond.repeat(1, repeat, 1))
             
         conds_tensor = torch.cat(final_conds)
         pooleds_tensor = torch.cat(pooleds)
         return ([[conds_tensor, {"pooled_output": pooleds_tensor}]], )
 
+class StringInput:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"text": ("STRING", {"multiline": True})}}
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "get_text"
+    CATEGORY = "conditioning_batch"
+    def get_text(self, text): return (text, )
+
+class BatchString:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {}}
+    RETURN_TYPES = ("BATCH_STRING",)
+    FUNCTION = "get_batch"
+    CATEGORY = "conditioning_batch"
+    def get_batch(self, **kwargs):
+        return ([kwargs[f"text{i+1}"] for i in range(len(kwargs))], )
+
 NODE_CLASS_MAPPINGS = {
-    "CLIPTextEncodeBatch": CLIPTextEncodeBatch
+    "CLIP Text Encode (Batch)": CLIPTextEncodeBatch,
+    "String Input": StringInput,
+    "Batch String": BatchString
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "CLIPTextEncodeBatch": "CLIP Text Encode Batch (FuLLet)"
+    "CLIP Text Encode (Batch)": "CLIP Text Encode Batch (FuLLet)",
+    "String Input": "String Input (FuLLet)",
+    "Batch String": "Batch String (FuLLet)"
 }

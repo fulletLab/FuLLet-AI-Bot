@@ -39,15 +39,19 @@
   },
   "75:67": {
     "inputs": {
-      "text": "",
       "clip": [
         "75:82",
         0
-      ]
+      ],
+      "batch_size": 1,
+      "text_1": "",
+      "text_2": "",
+      "text_3": "",
+      "text_4": ""
     },
-    "class_type": "CLIPTextEncode",
+    "class_type": "CLIP Text Encode (Batch)",
     "_meta": {
-      "title": "CLIP Text Encode (Negative Prompt)"
+      "title": "CLIP Text Encode Batch (Negative)"
     }
   },
   "75:72": {
@@ -160,15 +164,19 @@
   },
   "75:74": {
     "inputs": {
-      "text": "a woman",
       "clip": [
         "75:82",
         0
-      ]
+      ],
+      "batch_size": 1,
+      "text_1": "",
+      "text_2": "",
+      "text_3": "",
+      "text_4": ""
     },
-    "class_type": "CLIPTextEncode",
+    "class_type": "CLIP Text Encode (Batch)",
     "_meta": {
-      "title": "CLIP Text Encode (Positive Prompt)"
+      "title": "CLIP Text Encode Batch (Positive)"
     }
   }
 }

@@ -49,7 +49,7 @@ Architecture flexibility:
 ## Prerequisites
 1. **ComfyUI**: Installed and accessible via HTTP.
 2. **GGUF Nodes**: Required for loading Flux GGUF models.
-3. **FuLLet Custom Node**: You MUST copy `comfy_custom_nodes/batch_conditioning.py` to your `ComfyUI/custom_nodes/` folder and restart the server.
+3. **FuLLet Custom Nodes**: You MUST copy the entire `comfy_custom_nodes/` folder to your `ComfyUI/custom_nodes/` directory and restart the server.
 4. **Database**: SQLite (default) or any PostgreSQL service.
 5. **Python 3.10+**: And dependencies from `requirements.txt`.
 
