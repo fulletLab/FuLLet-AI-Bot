@@ -99,7 +99,16 @@ graph TD
     E -->|No| G[Encolar y esperar]
     C --> H[Actualizar VRAM usada]
     F --> H
+    F --> H
 ```
+
+> [!WARNING]
+> **Limitaciones del Sistema de VRAM**:
+> Este sistema funciona mediante **estimación manual** basada en la configuración del `.env`.
+> - No detecta el uso real de VRAM en tiempo real.
+> - No monitorea carga de CPU ni uso de RAM del sistema.
+> - Si configuras incorrectamente los valores de VRAM, pueden ocurrir errores (OOM).
+> - Se recomienda configurar valores conservadores (dejar un margen de seguridad).
 
 2. Configuración de Flujos (`/flujos`):
    Para evitar errores, abre los archivos JSON en la carpeta `/flujos` y asegúrate de que los siguientes campos coincidan con los nombres de tus modelos en ComfyUI:

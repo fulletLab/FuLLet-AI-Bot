@@ -5,7 +5,7 @@ from modules.queue_manager.manager import queue_manager
 from modules.utils.db_manager import get_db_session, save_db_session
 
 PROMPTS = ["hyperrealistic, 8k", "cyberpunk city", "fantasy landscape", "portrait", "3d render"]
-PROMPTS_EDIT = ["same image but realistic style", "change the background", "change the lighting", "change the composition", "change the style", "change the colors"]
+PROMPTS_EDIT = ["Exactly the same image, don't change anything, but in a realistic style", "change the background", "change the lighting", "change the composition", "change the style", "change the colors"]
 
 class ImageCommands(commands.Cog):
     def __init__(self, bot):
@@ -30,8 +30,7 @@ class ImageCommands(commands.Cog):
 
     @imagine.autocomplete("prompt")
     async def imagine_auto(self, interaction: discord.Interaction, current: str):
-        total = PROMPTS + PROMPTS_EDIT
-        return [app_commands.Choice(name=c, value=c) for c in total if current.lower() in c.lower()][:25]
+        return [app_commands.Choice(name=c, value=c) for c in PROMPTS if current.lower() in c.lower()][:25]
 
     @app_commands.command(name="edit", description="Edit image")
     @app_commands.choices(model=[

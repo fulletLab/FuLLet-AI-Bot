@@ -56,16 +56,18 @@ class ImageBot(commands.Bot):
             duration = round(time.time() - job.start_time, 1)
             idx = get_next_image_index()
             name = f"{idx:02d}.jpg"
-            path = os.path.join(r"D:\usuarios", "imagen")
-            if not os.path.exists(path):
-                try: os.makedirs(path)
-                except: pass
             
-            if os.path.exists(path):
-                try:
-                    with open(os.path.join(path, name), "wb") as f:
-                        f.write(result["image_bytes"])
-                except: pass
+            export_path = os.getenv("EXPORT_PATH")
+            if export_path:
+                if not os.path.exists(export_path):
+                    try: os.makedirs(export_path)
+                    except: pass
+                
+                if os.path.exists(export_path):
+                    try:
+                        with open(os.path.join(export_path, name), "wb") as f:
+                            f.write(result["image_bytes"])
+                    except: pass
 
             save_db_session(job.user_id, channel.id, result["image_bytes"], name)
             file = discord.File(io.BytesIO(result["image_bytes"]), filename=name)

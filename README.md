@@ -99,7 +99,16 @@ graph TD
     E -->|No| G[Queue and Wait]
     C --> H[Update Used VRAM]
     F --> H
+    F --> H
 ```
+
+> [!WARNING]
+> **VRAM System Limitations**:
+> This system relies on **manual estimation** based on your `.env` configuration.
+> - It does NOT detect real-time VRAM usage.
+> - It does NOT monitor CPU load or system RAM.
+> - Incorrect configuration may lead to Out-Of-Memory (OOM) errors.
+> - Conservative values are recommended (leave a safety margin).
 
 2. Workflow Setup (`/flujos`):
    To avoid errors, open the JSON files in the `/flujos` directory and ensure the following fields match your ComfyUI model names:

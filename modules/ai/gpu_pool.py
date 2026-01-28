@@ -1,6 +1,7 @@
 import os
 import asyncio
 import aiohttp
+import base64
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict
 import time
@@ -12,7 +13,7 @@ VRAM_REQUIREMENTS = {
     "z-image": 5.0
 }
 
-DEFAULT_VRAM_GB = 16.0
+DEFAULT_VRAM_GB = 8.0
 MIN_FREE_VRAM = float(os.getenv("MIN_FREE_VRAM", "4.0"))
 
 
@@ -86,7 +87,14 @@ class GPUPool:
     
     async def health_check(self, gpu: GPUInstance) -> bool:
         try:
-            headers = {"Authorization": f"Bearer {gpu.api_key}"} if gpu.api_key else {}
+            headers = {}
+            if gpu.api_key:
+                if ":" in gpu.api_key:
+                    encoded = base64.b64encode(gpu.api_key.encode()).decode()
+                    headers = {"Authorization": f"Basic {encoded}"}
+                else:
+                    headers = {"Authorization": f"Bearer {gpu.api_key}"}
+            
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{gpu.url}/system_stats", headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
                     gpu.is_healthy = response.status == 200

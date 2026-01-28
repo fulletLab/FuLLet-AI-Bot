@@ -4,6 +4,7 @@ import time
 import asyncio
 import os
 import aiohttp
+import base64
 from modules.utils.image_filter import sanitize_image
 from modules.ai.gpu_pool import gpu_pool
 
@@ -12,9 +13,14 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 
 def get_headers(api_key: str) -> dict:
-    if api_key:
-        return {"Authorization": f"Bearer {api_key}"}
-    return {}
+    if not api_key:
+        return {}
+    
+    if ":" in api_key:
+        encoded = base64.b64encode(api_key.encode()).decode()
+        return {"Authorization": f"Basic {encoded}"}
+    
+    return {"Authorization": f"Bearer {api_key}"}
 
 
 def load_workflow(filename: str) -> dict:

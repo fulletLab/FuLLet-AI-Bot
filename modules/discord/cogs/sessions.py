@@ -27,7 +27,18 @@ class SessionManager(commands.Cog):
 
         if db_s and db_s.updated_at and (now - db_s.updated_at) < 1800:
             channel = interaction.guild.get_channel(db_s.channel_id)
-            if channel: return channel
+            if channel:
+                try:
+                    await channel.set_permissions(interaction.user,
+                        view_channel=True,
+                        send_messages=True,
+                        use_application_commands=True,
+                        read_message_history=True,
+                        embed_links=True,
+                        attach_files=True
+                    )
+                except: pass
+                return channel
             delete_db_session(db_s.channel_id)
         elif db_s:
             delete_db_session(db_s.channel_id)
