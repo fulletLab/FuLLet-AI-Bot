@@ -44,6 +44,13 @@ class SessionManager(commands.Cog):
             delete_db_session(db_s.channel_id)
 
         category = discord.utils.get(interaction.guild.categories, name="sessions")
+        
+        ch_name = f"session-{interaction.user.name.lower()}"
+        existing_ch = discord.utils.get(interaction.guild.text_channels, name=ch_name)
+        if existing_ch:
+            save_db_session(user_id, existing_ch.id)
+            return existing_ch
+
         if not category:
             cat_overwrites = {
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -63,7 +70,7 @@ class SessionManager(commands.Cog):
             )
         }
         channel = await interaction.guild.create_text_channel(
-            name=f"session-{interaction.user.name.lower()}",
+            name=ch_name,
             overwrites=overwrites, category=category
         )
         save_db_session(user_id, channel.id)

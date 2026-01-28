@@ -9,13 +9,14 @@ class AdminTools(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         for guild in self.bot.guilds:
-            admin_ch = discord.utils.get(guild.text_channels, name="admin-tools")
-            if not admin_ch:
-                overwrites = {
-                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                    guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-                }
-                await guild.create_text_channel("admin-tools", overwrites=overwrites)
+            existing = discord.utils.get(guild.text_channels, name="admin-tools")
+            if existing: continue
+            
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            }
+            await guild.create_text_channel("admin-tools", overwrites=overwrites)
 
     @commands.command(name="sync", hidden=True)
     @commands.has_permissions(administrator=True)

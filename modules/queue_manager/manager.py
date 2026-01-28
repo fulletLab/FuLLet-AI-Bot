@@ -25,6 +25,22 @@ class QueueManager:
         self.is_running = False
 
     async def add_job(self, priority, prompt, context, user_id, is_edit=False, input_image_bytes=None, input_filename=None, model_type="flux"):
+        user_id_str = str(user_id)
+        active_count = 0
+        
+        tmp_queue = []
+        while not self.queue.empty():
+            item = await self.queue.get()
+            if str(item.user_id) == user_id_str:
+                active_count += 1
+            tmp_queue.append(item)
+            
+        for item in tmp_queue:
+            await self.queue.put(item)
+            
+        if active_count >= 2:
+            return -1
+
         job = Job(priority, prompt, context, user_id, is_edit, input_image_bytes, input_filename, model_type)
         await self.queue.put(job)
         return self.queue.qsize()

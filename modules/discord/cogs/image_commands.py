@@ -26,6 +26,8 @@ class ImageCommands(commands.Cog):
             prompt=prompt, context=channel, user_id=interaction.user.id,
             is_edit=False, model_type=model
         )
+        if q_pos == -1:
+            return await interaction.followup.send("Limit reached (max 2 jobs).", ephemeral=True)
         await interaction.followup.send(f"Queued (Pos: {q_pos}) in: {channel.mention}", ephemeral=True)
 
     @imagine.autocomplete("prompt")
@@ -57,6 +59,8 @@ class ImageCommands(commands.Cog):
             is_edit=True, input_image_bytes=img_bytes, input_filename=img_name,
             model_type=model
         )
+        if q_pos == -1:
+            return await interaction.followup.send("Limit reached (max 2 jobs).", ephemeral=True)
         await interaction.followup.send(f"Queued (Pos: {q_pos}) in: {channel.mention}", ephemeral=True)
 
     @edit.autocomplete("new_prompt")
