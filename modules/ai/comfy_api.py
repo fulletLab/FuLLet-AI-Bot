@@ -102,68 +102,77 @@ async def process_image_batch(jobs):
             if nid in base_workflow:
                 merged[nid] = base_workflow[nid]
 
-        results = []
+        batch_size = len(jobs)
+        
+        merged["latent"] = {
+            "inputs": {"width": 1024, "height": 1024, "batch_size": batch_size},
+            "class_type": "EmptyFlux2LatentImage"
+        }
+        merged["scheduler"] = {
+            "inputs": {"steps": 4, "width": 1024, "height": 1024},
+            "class_type": "Flux2Scheduler"
+        }
+        merged["noise"] = {
+            "inputs": {"noise_seed": random.randint(1, 10**15)},
+            "class_type": "RandomNoise"
+        }
+        merged["sampler_node"] = base_workflow["75:61"]
+
+        last_pos = None
+        last_neg = None
+
         for i, job in enumerate(jobs):
-            prefix = f"u{i}_"
+            p_node = f"p_{i}"
+            n_node = f"n_{i}"
             
-            p_prompt = prefix + "75_74"
-            n_prompt = prefix + "75_67"
-            latent = prefix + "75_66"
-            scheduler = prefix + "75_62"
-            noise = prefix + "75_73"
-            guider = prefix + "75_63"
-            sampler = prefix + "75_64"
-            decode = prefix + "75_65"
-            save = prefix + "save"
-            
-            merged[p_prompt] = {
+            merged[p_node] = {
                 "inputs": {"text": job.prompt, "clip": ["75:82", 0]},
                 "class_type": "CLIPTextEncode"
             }
-            merged[n_prompt] = {
+            merged[n_node] = {
                 "inputs": {"text": "", "clip": ["75:82", 0]},
                 "class_type": "CLIPTextEncode"
             }
-            merged[latent] = {
-                "inputs": {"width": 1024, "height": 1024, "batch_size": 1},
-                "class_type": "EmptyFlux2LatentImage"
-            }
-            merged[scheduler] = {
-                "inputs": {"steps": 4, "width": 1024, "height": 1024},
-                "class_type": "Flux2Scheduler"
-            }
-            merged[noise] = {
-                "inputs": {"noise_seed": random.randint(1, 10**15)},
-                "class_type": "RandomNoise"
-            }
-            merged[guider] = {
-                "inputs": {"cfg": 1, "model": ["75:83", 0], "positive": [p_prompt, 0], "negative": [n_prompt, 0]},
-                "class_type": "CFGGuider"
-            }
-            merged[sampler] = {
-                "inputs": {
-                    "noise": [noise, 0],
-                    "guider": [guider, 0],
-                    "sampler": ["75:61", 0],
-                    "sigmas": [scheduler, 0],
-                    "latent_image": [latent, 0]
-                },
-                "class_type": "SamplerCustomAdvanced"
-            }
             
             if i == 0:
-                merged["75:61"] = base_workflow["75:61"]
-            
-            merged[decode] = {
-                "inputs": {"samples": [sampler, 0], "vae": ["75:72", 0]},
-                "class_type": "VAEDecode"
-            }
-            merged[save] = {
-                "inputs": {"filename_prefix": f"batch_{job.user_id}", "images": [decode, 0]},
-                "class_type": "SaveImage"
-            }
-            
-            results.append({"job": job, "save_node": save})
+                last_pos = p_node
+                last_neg = n_node
+            else:
+                p_batch = f"p_batch_{i}"
+                n_batch = f"n_batch_{i}"
+                merged[p_batch] = {
+                    "inputs": {"conditioning_1": [last_pos, 0], "conditioning_2": [p_node, 0]},
+                    "class_type": "ConditioningBatch"
+                }
+                merged[n_batch] = {
+                    "inputs": {"conditioning_1": [last_neg, 0], "conditioning_2": [n_node, 0]},
+                    "class_type": "ConditioningBatch"
+                }
+                last_pos = p_batch
+                last_neg = n_batch
+
+        merged["guider"] = {
+            "inputs": {"cfg": 1, "model": ["75:83", 0], "positive": [last_pos, 0], "negative": [last_neg, 0]},
+            "class_type": "CFGGuider"
+        }
+        merged["sampler"] = {
+            "inputs": {
+                "noise": ["noise", 0],
+                "guider": ["guider", 0],
+                "sampler": ["sampler_node", 0],
+                "sigmas": ["scheduler", 0],
+                "latent_image": ["latent", 0]
+            },
+            "class_type": "SamplerCustomAdvanced"
+        }
+        merged["decode"] = {
+            "inputs": {"samples": ["sampler", 0], "vae": ["75:72", 0]},
+            "class_type": "VAEDecode"
+        }
+        merged["save"] = {
+            "inputs": {"filename_prefix": "batch_gen", "images": ["decode", 0]},
+            "class_type": "SaveImage"
+        }
 
         try:
             response = await queue_prompt(merged, gpu.url, gpu.api_key)
@@ -179,19 +188,22 @@ async def process_image_batch(jobs):
         final_responses = []
         if history_entry:
             outputs = history_entry.get("outputs", {})
-            for res in results:
-                save_node = res["save_node"]
-                if save_node in outputs and "images" in outputs[save_node]:
-                    img_data = outputs[save_node]["images"][0]
-                    img_bytes = await get_image(img_data["filename"], img_data["subfolder"], img_data["type"], gpu.url, gpu.api_key)
-                    final_responses.append({
-                        "status": "success",
-                        "image_bytes": img_bytes,
-                        "filename": img_data["filename"],
-                        "user_id": res["job"].user_id
-                    })
-                else:
-                    final_responses.append({"status": "error", "message": "Generation failed"})
+            if "save" in outputs and "images" in outputs["save"]:
+                images_list = outputs["save"]["images"]
+                for i, job in enumerate(jobs):
+                    if i < len(images_list):
+                        img_data = images_list[i]
+                        img_bytes = await get_image(img_data["filename"], img_data["subfolder"], img_data["type"], gpu.url, gpu.api_key)
+                        final_responses.append({
+                            "status": "success",
+                            "image_bytes": img_bytes,
+                            "filename": img_data["filename"],
+                            "user_id": job.user_id
+                        })
+                    else:
+                        final_responses.append({"status": "error", "message": "Image index missing"})
+            else:
+                return [{"status": "error", "message": "No output images"} for _ in jobs]
         else:
             return [{"status": "error", "message": "Timeout"} for _ in jobs]
             
