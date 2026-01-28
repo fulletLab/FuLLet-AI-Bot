@@ -97,3 +97,6 @@ El bot construye los flujos dinámicamente usando plantillas:
 2. **Restricción de Servidor**: Usa siempre `ALLOWED_GUILD_ID`.
 3. **Firewall**: Protege la API de ComfyUI con API Key y preferiblemente mediante un túnel seguro.
 4. **Privacidad de Datos**: La carpeta `database/` está excluida de Git. Mantenla privada.
+
+## Créditos
+Los nodos de batching personalizados incluidos en este proyecto son una versión modificada basada en el trabajo original de [laksjdjf](https://github.com/laksjdjf) en el repositorio [Batch-Condition-ComfyUI](https://github.com/laksjdjf/Batch-Condition-ComfyUI). Agradecemos su contribución a la comunidad de ComfyUI.

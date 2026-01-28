@@ -99,3 +99,6 @@ Ensure `unet_name` and `clip_name` in these files match your server's filename e
 2. **Firewall**: Protect ComfyUI ports with API Key and restricted access.
 3. **Session Privacy**: `database/` is excluded from git to protect user data.
 4. **SSL**: Always use `sslmode=require` for cloud databases.
+
+## Credits
+The custom batching nodes included in this project are a modified version based on the original work by [laksjdjf](https://github.com/laksjdjf) in the [Batch-Condition-ComfyUI](https://github.com/laksjdjf/Batch-Condition-ComfyUI) repository. We acknowledge and appreciate their contribution to the ComfyUI community.
