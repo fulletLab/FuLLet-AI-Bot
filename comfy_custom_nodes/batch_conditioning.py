@@ -59,8 +59,17 @@ class CLIPTextEncodeBatch:
             final_conds.append(cond.repeat(1, repeat, 1))
             
         conds_tensor = torch.cat(final_conds)
-        pooleds_tensor = torch.cat(pooleds)
-        return ([[conds_tensor, {"pooled_output": pooleds_tensor}]], )
+        
+        valid_pooled = [p for p in pooleds if p is not None]
+        if len(valid_pooled) == len(pooleds):
+            pooleds_tensor = torch.cat(pooleds)
+            return ([[conds_tensor, {"pooled_output": pooleds_tensor}]], )
+        elif len(valid_pooled) > 0:
+
+            pooleds_tensor = torch.cat(valid_pooled)
+            return ([[conds_tensor, {"pooled_output": pooleds_tensor}]], )
+        else:
+            return ([[conds_tensor, {}]], )
 
 class StringInput:
     @classmethod

@@ -1,9 +1,9 @@
 import { app } from "../../../scripts/app.js";
 
 app.registerExtension({
-    name: "FuLLet.BatchString",
+    name: "Comfy.conditioning_batch.Batch String",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name === "BatchString") {
+        if (nodeData.name === "Batch String") {
             nodeType.prototype.onNodeCreated = function () {
                 this.getExtraMenuOptions = function (_, options) {
                     options.unshift(
@@ -29,5 +29,9 @@ app.registerExtension({
                 }
             }
         }
-    }
+    },
+    loadedGraphNode(node, _) {
+        if (node.type === "Batch String") {
+        }
+    },
 });

@@ -1,5 +1,11 @@
-from .batch_conditioning import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from .batch_conditioning import CLIPTextEncodeBatch, StringInput, BatchString
+
+NODE_CLASS_MAPPINGS = {
+    "CLIP Text Encode (Batch)": CLIPTextEncodeBatch,
+    "String Input": StringInput,
+    "Batch String": BatchString
+}
 
 WEB_DIRECTORY = "./js"
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
+__all__ = ["NODE_CLASS_MAPPINGS", "WEB_DIRECTORY"]
