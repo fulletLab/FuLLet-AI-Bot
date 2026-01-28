@@ -19,10 +19,31 @@ Bot profesional de Discord para generación de imágenes por IA, modularizado me
 
 ## Cómo Funciona
 
-El bot utiliza un motor multi-trabajador que se conecta a una o varias instancias de ComfyUI vía HTTP. Optimiza el procesamiento agrupando prompts individuales en lotes (batches) dinámicos.
+El bot utiliza un motor multi-trabajador que se conecta a una o varias instancias de ComfyUI vía HTTP. Actúa como un cliente ligero que gestiona la cola y la construcción dinámica de flujos.
+
+```mermaid
+graph TD
+    A[Usuarios Discord] -->|Prompts| B[QueueManager]
+    B -->|Filtro de Justicia| C{Pool de Trabajadores}
+    C -->|Worker 1| D[GPU 1: Lote 1]
+    C -->|Worker N| E[GPU N: Lote N]
+    D -->|Real Batching| F[Instancia ComfyUI]
+    E -->|Real Batching| F
+    F -->|Imágenes Generadas| G[Distribución de Resultados]
+    G -->|Mensaje Directo| A
+```
+
+Flexibilidad de la arquitectura:
+- Ejecuta el bot en cualquier servidor (no requiere GPU local).
+- Conecta GPUs locales o proveedores en la nube (RunPod, Vast.ai, Lambda).
+- Escala el sistema simplemente añadiendo más URLs a la configuración.
+
+## Motor de Procesamiento (Real Batching)
+
+Esta versión optimiza el rendimiento agrupando prompts individuales en lotes técnicos (Real Batching).
 
 Puntos técnicos clave:
-- **CLIP Text Encode (Batch)**: Combina hasta 4 prompts en un solo tensor de condicionamiento. Esto permite que la GPU realice un ÚNICO paso de sampling para todo el lote, ahorrando entre un 60-70% de VRAM comparado con samplers individuales.
+- **CLIP Text Encode (Batch)**: Combina hasta 4 prompts en un solo tensor de condicionamiento. Esto permite que la GPU realice un ÚNICO paso de sampling para todo el lote, ahorrando entre un 60-70% de VRAM.
 - **Balanceo de Trabajadores**: Cada URL de ComfyUI en la configuración crea un trabajador dedicado, maximizando el uso del hardware en múltiples GPUs locales o remotas.
 - **Gestión de Justicia**: El `QueueManager` utiliza una estrategia round-robin para llenar los lotes, asegurando que ningún usuario monopolice la GPU.
 
@@ -38,11 +59,6 @@ graph TD
     RD -->|Imagen A| UA[Usuario A]
     RD -->|Imagen B| UB[Usuario B]
 ```
-
-Flexibilidad de la arquitectura:
-- Ejecuta el bot en cualquier servidor (no requiere GPU local).
-- Conecta GPUs locales o proveedores en la nube (RunPod, Vast.ai, Lambda).
-- Escala el sistema simplemente añadiendo más URLs a la configuración.
 
 ## Estructura
 - `/modules/discord/bot.py`: Cargador principal y motor de trabajadores.

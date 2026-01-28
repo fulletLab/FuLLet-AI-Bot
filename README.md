@@ -19,16 +19,36 @@ Professional Discord bot for AI image generation, modularized using Cogs and int
 
 ## How It Works
 
-The bot operates a multi-worker engine that connects to one or more ComfyUI instances via HTTP. It optimizes processing by grouping individual prompts into dynamic batches.
+The bot operates a multi-worker engine that connects to one or more ComfyUI instances via HTTP. It acts as a lightweight client that manages the queue and dynamic workflow construction.
 
-Technical highlights:
+```mermaid
+graph TD
+    A[Discord Users] -->|Prompts| B[QueueManager]
+    B -->|Fairness Filter| C{Worker Pool}
+    C -->|Worker 1| D[GPU 1: Batch 1]
+    C -->|Worker N| E[GPU N: Batch N]
+    D -->|Real Batching| F[ComfyUI Instance]
+    E -->|Real Batching| F
+    F -->|Generated Images| G[Result Distribution]
+    G -->|Direct Message| A
+```
+
+Architecture flexibility:
+- Run the bot on any server (no GPU required for the bot itself).
+- Connect to local GPUs or remote cloud providers (RunPod, Vast.ai).
+- Scale by adding more URLs to the configuration.
+
+## Image Processing Engine (Real Batching)
+
+This version optimizes performance by grouping individual prompts into technical batches:
+
 - **CLIP Text Encode (Batch)**: Merges up to 4 user prompts into a single conditioning tensor. This allows the GPU to perform a single sampler pass for the entire batch, saving 60-70% VRAM compared to individual samplers.
 - **Dynamic Worker Balancing**: Each ComfyUI URL in the configuration spawns a dedicated worker, maximizing hardware utilization across multiple local or remote GPUs.
 - **Fairness Enforcement**: The `QueueManager` uses a round-robin strategy to fill batches, ensuring that no single user can monopolize the GPU.
 
 ```mermaid
 graph TD
-    U[Users] -->|Prompts| QM[QueueManager]
+    U[Discord Users] -->|Prompts| QM[QueueManager]
     QM -->|Dynamic Batches| W[Worker Pool]
     W -->|Merge Prompts| CTE["CLIP Text Encode (Batch)"]
     CTE -->|Single Pass Conditioning| KSA[SamplerCustomAdvanced]
@@ -38,11 +58,6 @@ graph TD
     RD -->|Image A| UA[User A]
     RD -->|Image B| UB[User B]
 ```
-
-Architecture flexibility:
-- Run the bot on any server (no GPU required for the bot itself).
-- Connect to local GPUs or remote cloud providers (RunPod, Vast.ai).
-- Scale by adding more URLs to the configuration.
 
 ## Structure
 - `/modules/discord/bot.py`: Main bot loader and worker engine.
