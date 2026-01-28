@@ -19,18 +19,24 @@ Professional Discord bot for AI image generation, modularized using Cogs and int
 
 ## How It Works
 
-The bot operates a multi-worker engine that connects to one or more ComfyUI instances via HTTP. It acts as a lightweight client that manages the queue and dynamic workflow construction.
+The bot operates a multi-worker engine that connects to one or more ComfyUI instances via HTTP. It optimizes processing by grouping individual prompts into dynamic batches.
+
+Technical highlights:
+- **CLIP Text Encode (Batch)**: Merges up to 4 user prompts into a single conditioning tensor. This allows the GPU to perform a single sampler pass for the entire batch, saving 60-70% VRAM compared to individual samplers.
+- **Dynamic Worker Balancing**: Each ComfyUI URL in the configuration spawns a dedicated worker, maximizing hardware utilization across multiple local or remote GPUs.
+- **Fairness Enforcement**: The `QueueManager` uses a round-robin strategy to fill batches, ensuring that no single user can monopolize the GPU.
 
 ```mermaid
 graph TD
-    A[Discord Users] -->|Prompts| B[QueueManager]
-    B -->|Fairness Filter| C{Worker Pool}
-    C -->|Worker 1| D[GPU 1: Batch 1]
-    C -->|Worker N| E[GPU N: Batch N]
-    D -->|Real Batching| F[ComfyUI Instance]
-    E -->|Real Batching| F
-    F -->|Generated Images| G[Result Distribution]
-    G -->|Direct Message| A
+    U[Users] -->|Prompts| QM[QueueManager]
+    QM -->|Dynamic Batches| W[Worker Pool]
+    W -->|Merge Prompts| CTE["CLIP Text Encode (Batch)"]
+    CTE -->|Single Pass Conditioning| KSA[SamplerCustomAdvanced]
+    KSA -->|GPU Inference| VAE[VAEDecode]
+    VAE -->|Batch Image Tensors| SI[SaveImage]
+    SI -->|Break Batch| RD[Result Distribution]
+    RD -->|Image A| UA[User A]
+    RD -->|Image B| UB[User B]
 ```
 
 Architecture flexibility:

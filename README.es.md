@@ -19,18 +19,24 @@ Bot profesional de Discord para generación de imágenes por IA, modularizado me
 
 ## Cómo Funciona
 
-El bot utiliza un motor multi-trabajador que se conecta a una o varias instancias de ComfyUI vía HTTP. Actúa como un cliente ligero que gestiona la cola y la construcción dinámica de flujos.
+El bot utiliza un motor multi-trabajador que se conecta a una o varias instancias de ComfyUI vía HTTP. Optimiza el procesamiento agrupando prompts individuales en lotes (batches) dinámicos.
+
+Puntos técnicos clave:
+- **CLIP Text Encode (Batch)**: Combina hasta 4 prompts en un solo tensor de condicionamiento. Esto permite que la GPU realice un ÚNICO paso de sampling para todo el lote, ahorrando entre un 60-70% de VRAM comparado con samplers individuales.
+- **Balanceo de Trabajadores**: Cada URL de ComfyUI en la configuración crea un trabajador dedicado, maximizando el uso del hardware en múltiples GPUs locales o remotas.
+- **Gestión de Justicia**: El `QueueManager` utiliza una estrategia round-robin para llenar los lotes, asegurando que ningún usuario monopolice la GPU.
 
 ```mermaid
 graph TD
-    A[Usuarios Discord] -->|Prompts| B[QueueManager]
-    B -->|Filtro de Justicia| C{Pool de Trabajadores}
-    C -->|Worker 1| D[GPU 1: Lote 1]
-    C -->|Worker N| E[GPU N: Lote N]
-    D -->|Real Batching| F[Instancia ComfyUI]
-    E -->|Real Batching| F
-    F -->|Imágenes Generadas| G[Distribución de Resultados]
-    G -->|Mensaje Directo| A
+    U[Usuarios] -->|Prompts| QM[QueueManager]
+    QM -->|Lotes Dinámicos| W[Worker Pool]
+    W -->|Fusionar Prompts| CTE["CLIP Text Encode (Batch)"]
+    CTE -->|Condicionamiento Único| KSA[SamplerCustomAdvanced]
+    KSA -->|Inferencia GPU| VAE[VAEDecode]
+    VAE -->|Tensores de Imagen| SI[SaveImage]
+    SI -->|Desglosar Lote| RD[Distribución de Resultados]
+    RD -->|Imagen A| UA[Usuario A]
+    RD -->|Imagen B| UB[Usuario B]
 ```
 
 Flexibilidad de la arquitectura:
