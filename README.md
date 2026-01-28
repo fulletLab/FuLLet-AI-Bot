@@ -17,7 +17,7 @@ Professional Discord bot for AI image generation, modularized using Cogs and int
 - `/modules/queue_manager/`: Priority queue and job management.
 - `/modules/utils/`: Database (SQLAlchemy) and image sanitization.
 
-## Setup
+## Configuration
 1. Define environment variables in `.env`:
    ```env
    DISCORD_TOKEN=your_token
@@ -25,8 +25,14 @@ Professional Discord bot for AI image generation, modularized using Cogs and int
    COMFY_URL=http://your-ip:8188
    COMFY_API_KEY=your_secret_key
    ```
-2. Install dependencies: `pip install -r requirements.txt`
-3. Launch application: `python app.py`
+2. Workflow Setup (`/flujos`):
+   To avoid errors, open the JSON files in the `/flujos` directory and ensure the following fields match your ComfyUI model names:
+   - `unet_name`: Rename to your specific diffusion model filename.
+   - `clip_name`: Rename to your specific CLIP model filename.
+   Alternatively, you can simply import your own flows by exporting them from ComfyUI in API format and replacing these files.
+
+3. Install dependencies: `pip install -r requirements.txt`
+4. Launch application: `python app.py`
 
 ## Commands
 - `/imagine [model] [prompt]`: Generate image with selected model.
@@ -63,8 +69,14 @@ Bot profesional de Discord para generación de imágenes por IA, modularizado me
    COMFY_URL=http://tu-ip:8188
    COMFY_API_KEY=tu_llave_secreta
    ```
-2. Instalar dependencias: `pip install -r requirements.txt`
-3. Iniciar aplicación: `python app.py`
+2. Configuración de Flujos (`/flujos`):
+   Para evitar errores, abre los archivos JSON en la carpeta `/flujos` y asegúrate de que los siguientes campos coincidan con los nombres de tus modelos en ComfyUI:
+   - `unet_name`: Cambiar por el nombre de tu archivo de modelo de difusión.
+   - `clip_name`: Cambiar por el nombre de tu archivo de modelo CLIP.
+   O simplemente importa tus propios flujos exportándolos desde ComfyUI en formato API y reemplazando los archivos actuales.
+
+3. Instalar dependencias: `pip install -r requirements.txt`
+4. Iniciar aplicación: `python app.py`
 
 ## Comandos
 - `/imagine [modelo] [prompt]`: Generar imagen con el modelo seleccionado.
