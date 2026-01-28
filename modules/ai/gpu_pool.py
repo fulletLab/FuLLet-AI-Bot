@@ -8,8 +8,8 @@ import time
 
 
 VRAM_REQUIREMENTS = {
-    "flux": 4.0,
-    "flux_edit": 5.0,
+    "flux": 3.0,
+    "flux_edit": 4.0,
     "z-image": 5.0
 }
 
@@ -87,13 +87,13 @@ class GPUPool:
     
     async def health_check(self, gpu: GPUInstance) -> bool:
         try:
-            headers = {}
+            headers = {"ngrok-skip-browser-warning": "69420"}
             if gpu.api_key:
                 if ":" in gpu.api_key:
                     encoded = base64.b64encode(gpu.api_key.encode()).decode()
-                    headers = {"Authorization": f"Basic {encoded}"}
+                    headers["Authorization"] = f"Basic {encoded}"
                 else:
-                    headers = {"Authorization": f"Bearer {gpu.api_key}"}
+                    headers["Authorization"] = f"Bearer {gpu.api_key}"
             
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{gpu.url}/system_stats", headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as response:

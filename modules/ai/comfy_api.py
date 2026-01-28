@@ -13,14 +13,17 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 
 def get_headers(api_key: str) -> dict:
+    headers = {"ngrok-skip-browser-warning": "69420"}
     if not api_key:
-        return {}
+        return headers
     
     if ":" in api_key:
         encoded = base64.b64encode(api_key.encode()).decode()
-        return {"Authorization": f"Basic {encoded}"}
-    
-    return {"Authorization": f"Bearer {api_key}"}
+        headers["Authorization"] = f"Basic {encoded}"
+    else:
+        headers["Authorization"] = f"Bearer {api_key}"
+        
+    return headers
 
 
 def load_workflow(filename: str) -> dict:
