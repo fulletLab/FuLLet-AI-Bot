@@ -1,9 +1,15 @@
 from sqlalchemy import create_engine, Column, String, Integer, BigInteger, Float, LargeBinary
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.pool import NullPool
 import os
 import time
 
-DB_PATH = "sqlite:///database/bot_data.db"
+
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if not DATABASE_URL:
+    DB_PATH = "sqlite:///database/bot_data.db"
+else:
+    DB_PATH = DATABASE_URL
 
 class Base(DeclarativeBase):
     pass
@@ -21,14 +27,24 @@ class GlobalCounter(Base):
     name = Column(String, primary_key=True)
     value = Column(Integer, default=0)
 
-engine = create_engine(DB_PATH)
+if DB_PATH.startswith("sqlite"):
+    engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DB_PATH, poolclass=NullPool, pool_pre_ping=True)
+
 SessionLocal = sessionmaker(bind=engine)
 
 def init_db():
-    db_dir = "database"
-    if not os.path.exists(db_dir):
-        os.makedirs(db_dir)
+
+    """Initialize database, creating tables and default records if needed."""
+
+    if DB_PATH.startswith("sqlite"):
+        db_dir = "database"
+        if not os.path.exists(db_dir):
+            os.makedirs(db_dir)
+
     Base.metadata.create_all(engine)
+    
     with SessionLocal() as session:
         if not session.get(GlobalCounter, "image_count"):
             session.add(GlobalCounter(name="image_count", value=0))
