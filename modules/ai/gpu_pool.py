@@ -6,16 +6,13 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict
 import time
 
-
 VRAM_REQUIREMENTS = {
-    "flux": 3.0,
-    "flux_edit": 4.0,
+    "flux": 4.0,
+    "flux_edit": 5.0,
     "z-image": 5.0
 }
 
 DEFAULT_VRAM_GB = 8.0
-MIN_FREE_VRAM = float(os.getenv("MIN_FREE_VRAM", "4.0"))
-
 
 @dataclass
 class GPUInstance:
@@ -47,7 +44,6 @@ class GPUInstance:
         self.used_vram = max(0, self.used_vram - required)
         self.active_jobs = max(0, self.active_jobs - 1)
 
-
 class GPUPool:
     def __init__(self):
         self.gpus: List[GPUInstance] = []
@@ -62,13 +58,13 @@ class GPUPool:
         if urls_str:
             urls = [u.strip() for u in urls_str.split(",") if u.strip()]
             vrams = [float(v.strip()) for v in vram_str.split(",") if v.strip()] if vram_str else []
-            
             for i, url in enumerate(urls):
                 vram = vrams[i] if i < len(vrams) else DEFAULT_VRAM_GB
                 self.gpus.append(GPUInstance(url=url, api_key=api_key, total_vram=vram))
         else:
             single_url = os.getenv("COMFY_URL", "http://127.0.0.1:8188")
-            self.gpus.append(GPUInstance(url=single_url, api_key=api_key, total_vram=DEFAULT_VRAM_GB))
+            vram = float(os.getenv("GPU_VRAM_GB", str(DEFAULT_VRAM_GB)))
+            self.gpus.append(GPUInstance(url=single_url, api_key=api_key, total_vram=vram))
     
     async def get_best_gpu(self, model_type: str) -> Optional[GPUInstance]:
         async with self.lock:
@@ -103,7 +99,7 @@ class GPUPool:
         gpu.last_check = time.time()
         return gpu.is_healthy
     
-    async def wait_for_available_gpu(self, model_type: str, timeout: float = 60.0) -> Optional[GPUInstance]:
+    async def wait_for_available_gpu(self, model_type: str, timeout: float = 300.0) -> Optional[GPUInstance]:
         start = time.time()
         while time.time() - start < timeout:
             gpu = await self.get_best_gpu(model_type)
@@ -111,18 +107,5 @@ class GPUPool:
                 return gpu
             await asyncio.sleep(1.0)
         return None
-    
-    def get_status(self) -> List[Dict]:
-        return [
-            {
-                "url": gpu.url,
-                "total_vram": gpu.total_vram,
-                "free_vram": gpu.free_vram,
-                "active_jobs": gpu.active_jobs,
-                "is_healthy": gpu.is_healthy
-            }
-            for gpu in self.gpus
-        ]
-
 
 gpu_pool = GPUPool()

@@ -38,42 +38,50 @@ class ImageBot(commands.Bot):
             return
         raise error
 
-    async def process_queue_job(self, job):
-        channel = job.context
-        db_s = get_db_session(job.user_id)
-        img_bytes, img_name = job.input_image_bytes, job.input_filename
+    async def process_queue_job(self, jobs):
+        from modules.ai.image_gen import process_image_batch
         
-        if job.is_edit and not img_bytes and db_s and db_s.last_img_bytes:
-            img_bytes, img_name = db_s.last_img_bytes, db_s.last_img_name
-
-        job.start_time = time.time()
-        q_info = f" (Queue: {queue_manager.queue.qsize() + 1})"
-        await channel.send(f"Generating: `{job.prompt}` [{job.model_type}]" + q_info + (" (Edit)" if job.is_edit else ""))
-        
-        result = await process_image_gen(job.prompt, img_bytes, img_name, job.model_type)
-        
-        if result["status"] == "success":
-            duration = round(time.time() - job.start_time, 1)
-            idx = get_next_image_index()
-            name = f"{idx:02d}.jpg"
+        batch_info = []
+        for job in jobs:
+            channel = job.context
+            db_s = get_db_session(job.user_id)
+            img_bytes, img_name = job.input_image_bytes, job.input_filename
             
-            export_path = os.getenv("EXPORT_PATH")
-            if export_path:
-                if not os.path.exists(export_path):
-                    try: os.makedirs(export_path)
-                    except: pass
-                
-                if os.path.exists(export_path):
-                    try:
-                        with open(os.path.join(export_path, name), "wb") as f:
-                            f.write(result["image_bytes"])
-                    except: pass
+            if job.is_edit and not img_bytes and db_s and db_s.last_img_bytes:
+                img_bytes, img_name = db_s.last_img_bytes, db_s.last_img_name
 
-            save_db_session(job.user_id, channel.id, result["image_bytes"], name)
-            file = discord.File(io.BytesIO(result["image_bytes"]), filename=name)
-            await channel.send(content=f"Done in {duration}s! <@{job.user_id}>\nPrompt: `{job.prompt}`", file=file)
-        else:
-            await channel.send(f"Error: {result.get('message', 'Failed')}")
+            job.start_time = time.time()
+            await channel.send(f"Batch Processing: `{job.prompt}`")
+            batch_info.append(job)
+
+        results = await process_image_batch(batch_info)
+        
+        for i, result in enumerate(results):
+            job = batch_info[i]
+            channel = job.context
+            
+            if result["status"] == "success":
+                duration = round(time.time() - job.start_time, 1)
+                idx = get_next_image_index()
+                name = f"{idx:02d}.jpg"
+                
+                export_path = os.getenv("EXPORT_PATH")
+                if export_path:
+                    if not os.path.exists(export_path):
+                        try: os.makedirs(export_path)
+                        except: pass
+                    
+                    if os.path.exists(export_path):
+                        try:
+                            with open(os.path.join(export_path, name), "wb") as f:
+                                f.write(result["image_bytes"])
+                        except: pass
+
+                save_db_session(job.user_id, channel.id, result["image_bytes"], name)
+                file = discord.File(io.BytesIO(result["image_bytes"]), filename=name)
+                await channel.send(content=f"Done in {duration}s! <@{job.user_id}>\nPrompt: `{job.prompt}`", file=file)
+            else:
+                await channel.send(f"Error for `{job.prompt}`: {result.get('message', 'Failed')}")
 
 bot = ImageBot()
 

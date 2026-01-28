@@ -83,78 +83,131 @@ def get_model_type_for_vram(model_type: str, is_edit: bool) -> str:
         return "z-image"
     return "flux_edit" if is_edit else "flux"
 
-
-async def process_image_gen(prompt, input_image_bytes=None, input_filename=None, model_type="flux"):
-    vram_type = get_model_type_for_vram(model_type, input_image_bytes is not None)
+async def process_image_batch(jobs):
+    if not jobs:
+        return []
     
-    gpu = await gpu_pool.wait_for_available_gpu(vram_type, timeout=120.0)
+    gpu = await gpu_pool.wait_for_available_gpu("flux", timeout=120.0)
     if not gpu:
-        return {"status": "error", "message": "No GPU available"}
+        return [{"status": "error", "message": "No GPU available"} for _ in jobs]
     
-    await gpu_pool.reserve_gpu(gpu, vram_type)
+    await gpu_pool.reserve_gpu(gpu, "flux")
     
     try:
-        if model_type == "z-image":
-            workflow_file = "z-image_imagine.json"
-        else:
-            workflow_file = "flux_edit.json" if input_image_bytes else "flux_image.json"
+        base_workflow = load_workflow("flux_image.json")
+        merged = {}
         
+        shared_loaders = ["75:72", "75:82", "75:83"]
+        for nid in shared_loaders:
+            if nid in base_workflow:
+                merged[nid] = base_workflow[nid]
+
+        results = []
+        for i, job in enumerate(jobs):
+            prefix = f"u{i}_"
+            
+            p_prompt = prefix + "75_74"
+            n_prompt = prefix + "75_67"
+            latent = prefix + "75_66"
+            scheduler = prefix + "75_62"
+            noise = prefix + "75_73"
+            guider = prefix + "75_63"
+            sampler = prefix + "75_64"
+            decode = prefix + "75_65"
+            save = prefix + "save"
+            
+            merged[p_prompt] = {
+                "inputs": {"text": job.prompt, "clip": ["75:82", 0]},
+                "class_type": "CLIPTextEncode"
+            }
+            merged[n_prompt] = {
+                "inputs": {"text": "", "clip": ["75:82", 0]},
+                "class_type": "CLIPTextEncode"
+            }
+            merged[latent] = {
+                "inputs": {"width": 1024, "height": 1024, "batch_size": 1},
+                "class_type": "EmptyFlux2LatentImage"
+            }
+            merged[scheduler] = {
+                "inputs": {"steps": 4, "width": 1024, "height": 1024},
+                "class_type": "Flux2Scheduler"
+            }
+            merged[noise] = {
+                "inputs": {"noise_seed": random.randint(1, 10**15)},
+                "class_type": "RandomNoise"
+            }
+            merged[guider] = {
+                "inputs": {"cfg": 1, "model": ["75:83", 0], "positive": [p_prompt, 0], "negative": [n_prompt, 0]},
+                "class_type": "CFGGuider"
+            }
+            merged[sampler] = {
+                "inputs": {
+                    "noise": [noise, 0],
+                    "guider": [guider, 0],
+                    "sampler": ["75:61", 0],
+                    "sigmas": [scheduler, 0],
+                    "latent_image": [latent, 0]
+                },
+                "class_type": "SamplerCustomAdvanced"
+            }
+            
+            if i == 0:
+                merged["75:61"] = base_workflow["75:61"]
+            
+            merged[decode] = {
+                "inputs": {"samples": [sampler, 0], "vae": ["75:72", 0]},
+                "class_type": "VAEDecode"
+            }
+            merged[save] = {
+                "inputs": {"filename_prefix": f"batch_{job.user_id}", "images": [decode, 0]},
+                "class_type": "SaveImage"
+            }
+            
+            results.append({"job": job, "save_node": save})
+
         try:
-            workflow = load_workflow(workflow_file)
-        except Exception as e:
-            return {"status": "error", "message": f"Workflow error: {e}"}
-        
-        if model_type == "z-image":
-            if "6" in workflow: workflow["6"]["inputs"]["text"] = prompt
-            seed = random.randint(1, 10**15)
-            if "32" in workflow: workflow["32"]["inputs"]["noise_seed"] = seed
-            if "33" in workflow: workflow["33"]["inputs"]["noise_seed"] = seed
-        else:
-            if "75:74" in workflow: workflow["75:74"]["inputs"]["text"] = prompt
-            if "75:73" in workflow: workflow["75:73"]["inputs"]["noise_seed"] = random.randint(1, 10**15)
-        
-        if input_image_bytes and model_type != "z-image" and "103" in workflow:
-            try:
-                upload_result = await upload_image(input_image_bytes, input_filename, gpu.url, gpu.api_key)
-                workflow["103"]["inputs"]["image"] = upload_result["name"]
-            except Exception as e:
-                return {"status": "error", "message": "Image upload failed"}
-        
-        try:
-            response = await queue_prompt(workflow, gpu.url, gpu.api_key)
+            response = await queue_prompt(merged, gpu.url, gpu.api_key)
             prompt_id = response.get("prompt_id")
-        except Exception as e:
-            return {"status": "error", "message": "Connection error"}
+        except:
+            return [{"status": "error", "message": "Connection error"} for _ in jobs]
         
         if not prompt_id:
-            return {"status": "error", "message": "Queue full"}
+            return [{"status": "error", "message": "Queue full"} for _ in jobs]
 
         history_entry = await wait_for_image(prompt_id, gpu.url, gpu.api_key)
         
+        final_responses = []
         if history_entry:
-            try:
-                outputs = history_entry.get("outputs", {})
-                for node_id, node_output in outputs.items():
-                    if "images" in node_output:
-                        image_data = node_output["images"][0]
-                        image_bytes = await get_image(
-                            image_data["filename"], 
-                            image_data["subfolder"], 
-                            image_data["type"],
-                            gpu.url,
-                            gpu.api_key
-                        )
-                        return {
-                            "status": "success", 
-                            "image_bytes": image_bytes, 
-                            "filename": image_data["filename"],
-                            "gpu_url": gpu.url
-                        }
-            except: 
-                pass
-                    
-        return {"status": "error", "message": "Generation failed"}
-    
+            outputs = history_entry.get("outputs", {})
+            for res in results:
+                save_node = res["save_node"]
+                if save_node in outputs and "images" in outputs[save_node]:
+                    img_data = outputs[save_node]["images"][0]
+                    img_bytes = await get_image(img_data["filename"], img_data["subfolder"], img_data["type"], gpu.url, gpu.api_key)
+                    final_responses.append({
+                        "status": "success",
+                        "image_bytes": img_bytes,
+                        "filename": img_data["filename"],
+                        "user_id": res["job"].user_id
+                    })
+                else:
+                    final_responses.append({"status": "error", "message": "Generation failed"})
+        else:
+            return [{"status": "error", "message": "Timeout"} for _ in jobs]
+            
+        return final_responses
+
     finally:
-        await gpu_pool.release_gpu(gpu, vram_type)
+        await gpu_pool.release_gpu(gpu, "flux")
+
+
+async def process_image_gen(prompt, input_image_bytes=None, input_filename=None, model_type="flux"):
+    class MockJob:
+        def __init__(self, p):
+            self.prompt = p
+            self.user_id = "single"
+            self.model_type = "flux"
+    
+    res = await process_image_batch([MockJob(prompt)])
+    return res[0]
 

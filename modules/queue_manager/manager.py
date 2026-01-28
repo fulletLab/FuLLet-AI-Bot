@@ -32,12 +32,27 @@ class QueueManager:
     async def start_worker(self, processor_callback):
         self.is_running = True
         while self.is_running:
+            jobs = []
             job = await self.queue.get()
+            jobs.append(job)
+            
+            start_wait = time.time()
+            while len(jobs) < 4:
+                remaining = 2.0 - (time.time() - start_wait)
+                if remaining <= 0:
+                    break
+                try:
+                    next_job = await asyncio.wait_for(self.queue.get(), timeout=remaining)
+                    jobs.append(next_job)
+                except asyncio.TimeoutError:
+                    break
+            
             try:
-                await processor_callback(job)
+                await processor_callback(jobs)
             except Exception as e:
                 print(f"Error: {e}")
             finally:
-                self.queue.task_done()
+                for _ in range(len(jobs)):
+                    self.queue.task_done()
 
 queue_manager = QueueManager()
