@@ -1,5 +1,6 @@
 import asyncio
 import time
+import os
 
 class Job:
     def __init__(self, priority, prompt, context, user_id, is_edit=False, input_image_bytes=None, input_filename=None, model_type="flux"):
@@ -45,15 +46,21 @@ class QueueManager:
         await self.queue.put(job)
         return self.queue.qsize()
 
-    async def start_worker(self, processor_callback):
+    async def start_worker(self, processor_callback, num_workers=1):
         self.is_running = True
+        workers = [self._worker_loop(processor_callback) for _ in range(num_workers)]
+        await asyncio.gather(*workers)
+
+    async def _worker_loop(self, processor_callback):
         while self.is_running:
             jobs = []
             job = await self.queue.get()
             jobs.append(job)
             
             start_wait = time.time()
-            while len(jobs) < 4:
+            max_batch = int(os.getenv("MAX_BATCH_SIZE", "4")) #esto lo puedes cambiar en el env a 2 para mas estabilidad
+                                                              #changed to 2 in the .env file for more stability
+            while len(jobs) < max_batch:
                 remaining = 2.0 - (time.time() - start_wait)
                 if remaining <= 0:
                     break

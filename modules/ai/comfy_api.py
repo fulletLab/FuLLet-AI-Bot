@@ -103,74 +103,77 @@ async def process_image_batch(jobs):
                 merged[nid] = base_workflow[nid]
 
         batch_size = len(jobs)
+        prompts = [j.prompt for j in jobs]
+        while len(prompts) < 4:
+            prompts.append("")
+
+        merged["p_batch"] = {
+            "inputs": {
+                "clip": ["75:82", 0],
+                "text_1": prompts[0],
+                "text_2": prompts[1],
+                "text_3": prompts[2],
+                "text_4": prompts[3]
+            },
+            "class_type": "CLIPTextEncodeBatch"
+        }
         
+        merged["n_batch"] = {
+            "inputs": {
+                "clip": ["75:82", 0],
+                "text_1": "",
+                "text_2": "",
+                "text_3": "",
+                "text_4": ""
+            },
+            "class_type": "CLIPTextEncodeBatch"
+        }
+
         merged["latent"] = {
             "inputs": {"width": 1024, "height": 1024, "batch_size": batch_size},
             "class_type": "EmptyFlux2LatentImage"
         }
+        
         merged["scheduler"] = {
             "inputs": {"steps": 4, "width": 1024, "height": 1024},
             "class_type": "Flux2Scheduler"
         }
+        
         merged["noise"] = {
             "inputs": {"noise_seed": random.randint(1, 10**15)},
             "class_type": "RandomNoise"
         }
-        merged["sampler_node"] = base_workflow["75:61"]
-
-        last_pos = None
-        last_neg = None
-
-        for i, job in enumerate(jobs):
-            p_node = f"p_{i}"
-            n_node = f"n_{i}"
-            
-            merged[p_node] = {
-                "inputs": {"text": job.prompt, "clip": ["75:82", 0]},
-                "class_type": "CLIPTextEncode"
-            }
-            merged[n_node] = {
-                "inputs": {"text": "", "clip": ["75:82", 0]},
-                "class_type": "CLIPTextEncode"
-            }
-            
-            if i == 0:
-                last_pos = p_node
-                last_neg = n_node
-            else:
-                p_batch = f"p_batch_{i}"
-                n_batch = f"n_batch_{i}"
-                merged[p_batch] = {
-                    "inputs": {"conditioning_1": [last_pos, 0], "conditioning_2": [p_node, 0]},
-                    "class_type": "ConditioningBatch"
-                }
-                merged[n_batch] = {
-                    "inputs": {"conditioning_1": [last_neg, 0], "conditioning_2": [n_node, 0]},
-                    "class_type": "ConditioningBatch"
-                }
-                last_pos = p_batch
-                last_neg = n_batch
-
+        
         merged["guider"] = {
-            "inputs": {"cfg": 1, "model": ["75:83", 0], "positive": [last_pos, 0], "negative": [last_neg, 0]},
+            "inputs": {
+                "cfg": 1,
+                "model": ["75:83", 0],
+                "positive": ["p_batch", 0],
+                "negative": ["n_batch", 0]
+            },
             "class_type": "CFGGuider"
         }
+        
         merged["sampler"] = {
             "inputs": {
                 "noise": ["noise", 0],
                 "guider": ["guider", 0],
-                "sampler": ["sampler_node", 0],
+                "sampler": ["75:61", 0],
                 "sigmas": ["scheduler", 0],
                 "latent_image": ["latent", 0]
             },
             "class_type": "SamplerCustomAdvanced"
         }
+        
+        merged["75:61"] = base_workflow["75:61"]
+        
         merged["decode"] = {
             "inputs": {"samples": ["sampler", 0], "vae": ["75:72", 0]},
             "class_type": "VAEDecode"
         }
+        
         merged["save"] = {
-            "inputs": {"filename_prefix": "batch_gen", "images": ["decode", 0]},
+            "inputs": {"filename_prefix": "batch", "images": ["decode", 0]},
             "class_type": "SaveImage"
         }
 
@@ -181,7 +184,7 @@ async def process_image_batch(jobs):
             return [{"status": "error", "message": "Connection error"} for _ in jobs]
         
         if not prompt_id:
-            return [{"status": "error", "message": "Queue full"} for _ in jobs]
+            return [{"status": "error", "message": "Workflow rejected"} for _ in jobs]
 
         history_entry = await wait_for_image(prompt_id, gpu.url, gpu.api_key)
         
@@ -201,7 +204,7 @@ async def process_image_batch(jobs):
                             "user_id": job.user_id
                         })
                     else:
-                        final_responses.append({"status": "error", "message": "Image index missing"})
+                        final_responses.append({"status": "error", "message": "Index missing"})
             else:
                 return [{"status": "error", "message": "No output images"} for _ in jobs]
         else:

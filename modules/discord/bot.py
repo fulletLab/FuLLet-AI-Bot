@@ -15,11 +15,14 @@ class ImageBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        cog_path = os.path.join("modules", "discord", "cogs")
-        for filename in os.listdir(cog_path):
-            if filename.endswith(".py"):
-                await self.load_extension(f"modules.discord.cogs.{filename[:-3]}")
-        self.loop.create_task(queue_manager.start_worker(self.process_queue_job))
+        for ext in ["modules.discord.cogs.admin", "modules.discord.cogs.image_commands", "modules.discord.cogs.sessions"]:
+            await self.load_extension(ext)
+        
+        urls = os.getenv("COMFY_URLS", os.getenv("COMFY_URL", "")).split(",")
+        num_workers = len([u for u in urls if u.strip()])
+        if num_workers == 0: num_workers = 1
+            
+        self.loop.create_task(queue_manager.start_worker(self.process_queue_job, num_workers=num_workers))
 
     async def on_ready(self):
         print(f"Bot: {self.user.name}")
