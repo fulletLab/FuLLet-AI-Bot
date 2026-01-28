@@ -110,6 +110,7 @@ async def process_image_batch(jobs):
         merged["p_batch"] = {
             "inputs": {
                 "clip": ["75:82", 0],
+                "batch_size": batch_size,
                 "text_1": prompts[0],
                 "text_2": prompts[1],
                 "text_3": prompts[2],
@@ -121,6 +122,7 @@ async def process_image_batch(jobs):
         merged["n_batch"] = {
             "inputs": {
                 "clip": ["75:82", 0],
+                "batch_size": batch_size,
                 "text_1": "",
                 "text_2": "",
                 "text_3": "",

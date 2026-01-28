@@ -17,10 +17,9 @@ class CLIPTextEncodeBatch:
         return {
             "required": {
                 "clip": ("CLIP", ),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 4}),
                 "text_1": ("STRING", {"multiline": True}),
                 "text_2": ("STRING", {"multiline": True}),
-            },
-            "optional": {
                 "text_3": ("STRING", {"multiline": True}),
                 "text_4": ("STRING", {"multiline": True}),
             }
@@ -29,20 +28,27 @@ class CLIPTextEncodeBatch:
     FUNCTION = "encode"
     CATEGORY = "conditioning_batch"
 
-    def encode(self, clip, text_1, text_2, text_3="", text_4=""):
-        texts = [text_1, text_2, text_3, text_4]
+    def encode(self, clip, batch_size, text_1, text_2, text_3, text_4):
+        all_texts = [text_1, text_2, text_3, text_4]
+        texts = all_texts[:batch_size]
         
         conds = []
         pooleds = []
         num_tokens = []
         
         for text in texts:
-            tokens = clip.tokenize(text if text else "")
+            safe_text = text if text and text.strip() else ""
+            tokens = clip.tokenize(safe_text)
             cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
             conds.append(cond)
             pooleds.append(pooled)
             num_tokens.append(cond.shape[1])
         
+        if not conds:
+            tokens = clip.tokenize("")
+            cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+            return ([[cond, {"pooled_output": pooled}]], )
+
         lcm_val = get_lcm_list(num_tokens)
         final_conds = []
         for cond, num in zip(conds, num_tokens):
