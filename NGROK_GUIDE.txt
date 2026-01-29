@@ -1,0 +1,141 @@
+# Ngrok Configuration Guide for FuLLet-AI-Bot
+
+This guide explains step-by-step how to securely expose your local ComfyUI instance (port 8188) so the Discord bot can accept jobs using your GPU from anywhere.
+
+## ⚠️ Security Warning: Why Use "Pro" Mode?
+Exposing your GPU to the internet has two risks:
+1.  **Unauthorized Usage**: Without a password, anyone with your Ngrok URL can use your GPU to generate images, potentially queueing thousands of jobs and making your PC unusable.
+2.  **File Access**: ComfyUI is a powerful tool. If exposed openly, attackers might exploit vulnerabilities to read or write files on your system.
+
+**Why Basic Auth (Pro Mode) is better:**
+- It adds a password layer essentially acting as a firewall.
+- Cloudflare/Ngrok blocks the request BEFORE it even reaches your computer if the password is wrong.
+- It is the standard industry practice for quick tunnels.
+
+---
+
+## 1. Quick Install
+If you don't have Ngrok yet:
+1.  Download Ngrok for Windows from [ngrok.com](https://ngrok.com/download).
+2.  Unzip the file and open a terminal (PowerShell or CMD) in that folder.
+3.  Authenticate with your token (find it in your [dashboard](https://dashboard.ngrok.com/get-started/your-authtoken)):
+
+```bash
+ngrok config add-authtoken YOUR_TOKEN_HERE_12345
+```
+
+## 2. Configure Static Domain (Mandatory)
+To avoid the URL changing every time you restart, use a fixed domain.
+1.  Go to [Cloud Edge > Domains](https://dashboard.ngrok.com/cloud-edge/domains).
+2.  Create a free domain (e.g., `my-powerful-gpu.ngrok-free.app`).
+
+## 3. Start the Tunnel (Main Command)
+This is the command you must run every time you want to turn on the bot. **Always use a password** for security.
+
+```bash
+ngrok http 8188 --domain=YOUR-DOMAIN.ngrok-free.app --basic-auth="user:password123"
+```
+*(Replace `YOUR-DOMAIN` and `user:password123` with your own details)*.
+
+## 4. Connect to the Bot (.env)
+Once you see "Session Status: online", configure your bot so it knows where to connect.
+
+Open the `.env` file and edit:
+```env
+# Exact URL shown by Ngrok (https://...)
+COMFY_URLS=https://my-powerful-gpu.ngrok-free.app
+
+# The credentials you set in the previous command
+COMFY_API_KEY=user:password123
+```
+
+The bot will automatically handle the authentication.
+
+---
+
+## Command Cheat Sheet
+
+| Action | Command |
+| :--- | :--- |
+| **Install Token** | `ngrok config add-authtoken <TOKEN>` |
+| **Start (Simple)** | `ngrok http 8188` |
+| **Start (Pro)** | `ngrok http 8188 --domain=... --basic-auth="u:p"` |
+| **Verify** | Open the URL in your browser; it should ask for a password. |
+
+## Common Errors
+- **Workflow Rejected**: Check if your GPU has enough VRAM or adjust `GPU_VRAM_GB` in `.env`.
+- **401 Unauthorized**: The password in `.env` does not match the one in the `--basic-auth` command.
+- **Warning Page**: The bot automatically includes the `ngrok-skip-browser-warning` header.
+
+================================================================================================
+                                      ESPAÑOL / SPANISH
+================================================================================================
+
+# Guía de Configuración de Ngrok para FuLLet-AI-Bot
+
+Esta guía explica paso a paso cómo exponer tu instancia local de ComfyUI (puerto 8188) de forma segura para que el bot de Discord pueda usar tu GPU desde cualquier lugar.
+
+## ⚠️ Advertencia de Seguridad: ¿Por qué usar el modo "Pro"?
+Exponer tu GPU a internet tiene dos riesgos principales:
+1.  **Uso No Autorizado**: Sin contraseña, cualquiera que tenga tu URL de Ngrok puede usar tu GPU para generar imágenes, posiblemente saturando tu cola con miles de trabajos.
+2.  **Acceso a Archivos**: ComfyUI es una herramienta potente. Si se expone abiertamente, atacantes podrían explotar vulnerabilidades para leer archivos de tu sistema.
+
+**Por qué Basic Auth (Modo Pro) es mejor:**
+- Añade una capa de contraseña que actúa esencialmente como un firewall.
+- Ngrok bloquea la petición ANTES de que llegue a tu computadora si la contraseña es incorrecta.
+- Es la práctica estándar de seguridad para túneles rápidos.
+
+---
+
+## 1. Instalación Rápida
+Si aún no tienes Ngrok:
+1.  Descarga Ngrok para Windows desde [ngrok.com](https://ngrok.com/download).
+2.  Descomprime el archivo y abre una terminal (PowerShell o CMD) en esa carpeta.
+3.  Autentícate con tu token (búscalo en tu [dashboard](https://dashboard.ngrok.com/get-started/your-authtoken)):
+
+```bash
+ngrok config add-authtoken TU_TOKEN_AQUI_12345
+```
+
+## 2. Configurar Dominio Estático (Obligatorio)
+Para evitar cambiar la URL cada vez que reinicias, usa un dominio fijo.
+1.  Ve a [Cloud Edge > Domains](https://dashboard.ngrok.com/cloud-edge/domains).
+2.  Crea un dominio gratuito (ej: `mi-gpu-potente.ngrok-free.app`).
+
+## 3. Iniciar el Túnel (Comando Principal)
+Este es el comando que debes ejecutar cada vez que quieras encender el bot. **Siempre usa contraseña** por seguridad.
+
+```bash
+ngrok http 8188 --domain=TU-DOMINIO.ngrok-free.app --basic-auth="usuario:password123"
+```
+*(Reemplaza `TU-DOMINIO` y `usuario:password123` con tus datos)*.
+
+## 4. Conectar con el Bot (.env)
+Una vez que veas "Session Status: online", configura tu bot para que sepa dónde conectar.
+
+Abre el archivo `.env` y edita:
+```env
+# URL exacta que muestra Ngrok (https://...)
+COMFY_URLS=https://mi-gpu-potente.ngrok-free.app
+
+# Las credenciales que pusiste en el comando anterior
+COMFY_API_KEY=usuario:password123
+```
+
+El bot se encargará automáticamente de la autenticación.
+
+---
+
+## Cheat Sheet de Comandos
+
+| Acción | Comando |
+| :--- | :--- |
+| **Instalar Token** | `ngrok config add-authtoken <TOKEN>` |
+| **Iniciar (Simple)** | `ngrok http 8188` |
+| **Iniciar (Pro)** | `ngrok http 8188 --domain=... --basic-auth="u:p"` |
+| **Verificar** | Abre la URL en tu navegador; debería pedirte clave. |
+
+## Solución de Errores Comunes
+- **Workflow Rejected**: Revisa si tu GPU tiene VRAM suficiente o ajusta `GPU_VRAM_GB` en el `.env`.
+- **401 Unauthorized**: La contraseña en el `.env` no coincide con la del comando `--basic-auth`.
+- **Warning Page**: El bot ya incluye el header `ngrok-skip-browser-warning` automáticamente.
