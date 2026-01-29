@@ -66,12 +66,12 @@ graph TD
 - `/modules/ai/`: Integración con API de ComfyUI y constructor dinámico de flujos.
 - `/modules/queue_manager/`: Cola de prioridad, cumplimiento de justicia y bucles de trabajo paralelos.
 - `/modules/utils/`: Base de datos (SQLAlchemy) y limpieza de imágenes.
-- `/comfy_custom_nodes/`: Nodos personalizados necesarios para el servidor ComfyUI.
+- `/various_indications_node/`: Nodos personalizados necesarios para el servidor ComfyUI.
 
 ## Requisitos Previos
 1. **ComfyUI**: Debe estar instalado y accesible vía HTTP.
 2. **Nodos GGUF**: Necesarios para cargar los modelos Flux pesados.
-3. **Nodos FuLLet**: DEBES copiar la carpeta completa `comfy_custom_nodes/` a tu directorio `ComfyUI/custom_nodes/` y reiniciar el servidor.
+3. **Nodos FuLLet**: DEBES copiar la carpeta completa `various_indications_node/` a tu directorio `ComfyUI/custom_nodes/` y reiniciar el servidor.
 4. **Base de Datos**: SQLite (por defecto) o cualquier servicio PostgreSQL.
 5. **Python 3.10+**: Y las dependencias listadas en `requirements.txt`.
 
