@@ -45,6 +45,16 @@ async def get_image(filename: str, subfolder: str, folder_type: str, gpu_url: st
         async with session.get(f"{gpu_url}/view", params=data, headers=get_headers(api_key)) as response:
             return await response.read()
 
+async def upload_image(image_bytes: bytes, filename: str, gpu_url: str, api_key: str) -> str:
+    data = aiohttp.FormData()
+    data.add_field('image', image_bytes, filename=filename, content_type='image/png')
+    data.add_field('overwrite', 'true')
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f"{gpu_url}/upload/image", data=data, headers=get_headers(api_key)) as response:
+            resp = await response.json()
+            return resp.get("name", filename)
+
 async def wait_for_image(prompt_id: str, gpu_url: str, api_key: str, timeout: int = 300) -> dict:
     start_time = time.time()
     while time.time() - start_time < timeout:
@@ -56,6 +66,95 @@ async def wait_for_image(prompt_id: str, gpu_url: str, api_key: str, timeout: in
 
 async def process_image_batch(jobs):
     if not jobs: return []
+    
+    edit_jobs = [j for j in jobs if j.is_edit or j.input_image_bytes]
+    standard_jobs = [j for j in jobs if not j.is_edit and not j.input_image_bytes]
+    
+    results = [None] * len(jobs)
+    
+    if standard_jobs:
+        std_results = await process_standard_batch(standard_jobs)
+        std_idx = 0
+        for i, job in enumerate(jobs):
+            if not job.is_edit and not job.input_image_bytes:
+                results[i] = std_results[std_idx]
+                std_idx += 1
+                
+    if edit_jobs:
+        for i, job in enumerate(jobs):
+            if job.is_edit or job.input_image_bytes:
+                results[i] = await process_single_edit_job(job)
+                
+    return results
+
+async def process_single_edit_job(job):
+    gpu = await gpu_pool.wait_for_available_gpu("flux", timeout=120.0)
+    if not gpu: return {"status": "error", "message": "No GPU available"}
+    
+    await gpu_pool.reserve_gpu(gpu, "flux")
+    try:
+        try:
+            workflow = load_workflow("flux_edit.json")
+        except FileNotFoundError:
+            return {"status": "error", "message": "Edit workflow not found"}
+            
+        if job.input_image_bytes:
+            filename = job.input_filename or f"upload_{int(time.time())}.png"
+            uploaded_name = await upload_image(job.input_image_bytes, filename, gpu.url, gpu.api_key)
+        else:
+            return {"status": "error", "message": "No input image for edit"}
+            
+        INPUT_NODE = "103"
+        POS_NODE = "75:74"
+        NEG_NODE = "75:67"
+        
+        if INPUT_NODE in workflow:
+            workflow[INPUT_NODE]["inputs"]["image"] = uploaded_name
+            
+        if POS_NODE in workflow:
+            workflow[POS_NODE]["inputs"]["text"] = job.prompt
+            
+        if NEG_NODE in workflow:
+            workflow[NEG_NODE]["inputs"]["text"] = ""
+
+        NOISE_NODE = "75:73"
+        if NOISE_NODE in workflow:
+            workflow[NOISE_NODE]["inputs"]["noise_seed"] = random.randint(1, 10**15)
+
+        try:
+            response = await queue_prompt(workflow, gpu.url, gpu.api_key)
+            prompt_id = response.get("prompt_id")
+            if not prompt_id:
+                msg = response.get("error", {}).get("message", "Workflow rejected")
+                return {"status": "error", "message": msg}
+                
+            history_entry = await wait_for_image(prompt_id, gpu.url, gpu.api_key)
+            
+            if history_entry:
+                outputs = history_entry.get("outputs", {})
+                save_node = "9" 
+                if save_node in outputs and "images" in outputs[save_node]:
+                    img_data = outputs[save_node]["images"][0]
+                    img_bytes = await get_image(img_data["filename"], img_data["subfolder"], img_data["type"], gpu.url, gpu.api_key)
+                    return {
+                        "status": "success",
+                        "image_bytes": img_bytes,
+                        "filename": img_data["filename"],
+                        "user_id": job.user_id
+                    }
+                else:
+                    return {"status": "error", "message": "No output images"}
+            else:
+                return {"status": "error", "message": "Timeout"}
+                
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    finally:
+        await gpu_pool.release_gpu(gpu, "flux")
+
+async def process_standard_batch(jobs):
+    if not jobs: return []
     gpu = await gpu_pool.wait_for_available_gpu("flux", timeout=120.0)
     if not gpu: return [{"status": "error", "message": "No GPU available"} for _ in jobs]
     await gpu_pool.reserve_gpu(gpu, "flux")
@@ -65,7 +164,6 @@ async def process_image_batch(jobs):
         prompts = [j.prompt for j in jobs]
         while len(prompts) < 4: prompts.append("")
 
-        # IDs matching flux_image.json
         POS_NODE = "75:74"
         NEG_NODE = "75:67"
         LATENT_NODE = "75:66"
@@ -109,7 +207,7 @@ async def process_image_batch(jobs):
         final_responses = []
         if history_entry:
             outputs = history_entry.get("outputs", {})
-            save_node = "9" # Matching flux_image.json
+            save_node = "9"
             if save_node in outputs and "images" in outputs[save_node]:
                 images_list = outputs[save_node]["images"]
                 for i, job in enumerate(jobs):
