@@ -14,9 +14,10 @@ class ImageCommands(commands.Cog):
     @app_commands.command(name="imagine", description="Generate image")
     @app_commands.choices(model=[
         app_commands.Choice(name="Flux (Schnell)", value="flux"),
-        app_commands.Choice(name="Z-Image (Turbo)", value="z-image")
+        app_commands.Choice(name="Z-Image (Turbo)", value="z-image"),
+        app_commands.Choice(name="Anima", value="anima")
     ])
-    async def imagine(self, interaction: discord.Interaction, model: str, prompt: str):
+    async def imagine(self, interaction: discord.Interaction, model: str, prompt: str, lora: str = None):
         await interaction.response.defer(ephemeral=True)
         sessions = self.bot.get_cog("SessionManager")
         channel = await sessions.get_or_create(interaction)
@@ -24,7 +25,7 @@ class ImageCommands(commands.Cog):
         q_pos = await queue_manager.add_job(
             priority=(0 if interaction.user.guild_permissions.administrator else 1),
             prompt=prompt, context=channel, user_id=interaction.user.id,
-            is_edit=False, model_type=model
+            is_edit=False, model_type=model, lora_name=lora
         )
         if q_pos == -1:
             return await interaction.followup.send("Limit reached (max 2 jobs).", ephemeral=True)
@@ -33,6 +34,11 @@ class ImageCommands(commands.Cog):
     @imagine.autocomplete("prompt")
     async def imagine_auto(self, interaction: discord.Interaction, current: str):
         return [app_commands.Choice(name=c, value=c) for c in PROMPTS if current.lower() in c.lower()][:25]
+
+    @imagine.autocomplete("lora")
+    async def lora_auto(self, interaction: discord.Interaction, current: str):
+        LORAS = ["fdi_anima_v1-e20.safetensors"]
+        return [app_commands.Choice(name=c, value=c) for c in LORAS if current.lower() in c.lower()][:25]
 
     @app_commands.command(name="edit", description="Edit image")
     @app_commands.choices(model=[

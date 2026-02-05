@@ -3,7 +3,7 @@ import time
 import os
 
 class Job:
-    def __init__(self, priority, prompt, context, user_id, is_edit=False, input_image_bytes=None, input_filename=None, model_type="flux"):
+    def __init__(self, priority, prompt, context, user_id, is_edit=False, input_image_bytes=None, input_filename=None, model_type="flux", lora_name=None):
         self.priority = priority
         self.prompt = prompt
         self.context = context
@@ -12,6 +12,7 @@ class Job:
         self.input_image_bytes = input_image_bytes
         self.input_filename = input_filename
         self.model_type = model_type
+        self.lora_name = lora_name
         self.timestamp = time.time()
         self.start_time = 0
 
@@ -25,7 +26,7 @@ class QueueManager:
         self.queue = asyncio.PriorityQueue()
         self.is_running = False
 
-    async def add_job(self, priority, prompt, context, user_id, is_edit=False, input_image_bytes=None, input_filename=None, model_type="flux"):
+    async def add_job(self, priority, prompt, context, user_id, is_edit=False, input_image_bytes=None, input_filename=None, model_type="flux", lora_name=None):
         user_id_str = str(user_id)
         active_count = 0
         
@@ -42,7 +43,7 @@ class QueueManager:
         if active_count >= 2:
             return -1
 
-        job = Job(priority, prompt, context, user_id, is_edit, input_image_bytes, input_filename, model_type)
+        job = Job(priority, prompt, context, user_id, is_edit, input_image_bytes, input_filename, model_type, lora_name)
         await self.queue.put(job)
         return self.queue.qsize()
 
