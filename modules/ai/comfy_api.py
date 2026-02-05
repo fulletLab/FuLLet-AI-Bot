@@ -120,8 +120,12 @@ async def process_anima_job(job):
                 img_bytes = await get_image(img_data["filename"], img_data["subfolder"], img_data["type"], gpu.url, gpu.api_key)
                 return {"status": "success", "image_bytes": img_bytes, "filename": img_data["filename"], "user_id": job.user_id}
         return {"status": "error", "message": "Timeout or no output"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    except aiohttp.ContentTypeError:
+        return {"status": "error", "message": "GPU server unavailable"}
+    except aiohttp.ClientError:
+        return {"status": "error", "message": "Connection error"}
+    except Exception:
+        return {"status": "error", "message": "Generation failed"}
     finally:
         await gpu_pool.release_gpu(gpu, "anima")
 
@@ -185,8 +189,12 @@ async def process_single_edit_job(job):
             else:
                 return {"status": "error", "message": "Timeout"}
                 
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+        except aiohttp.ContentTypeError:
+            return {"status": "error", "message": "GPU server unavailable"}
+        except aiohttp.ClientError:
+            return {"status": "error", "message": "Connection error"}
+        except Exception:
+            return {"status": "error", "message": "Edit failed"}
 
     finally:
         await gpu_pool.release_gpu(gpu, "flux")
@@ -234,8 +242,12 @@ async def process_standard_batch(jobs):
         try:
             response = await queue_prompt(workflow, gpu.url, gpu.api_key)
             prompt_id = response.get("prompt_id")
-        except:
+        except aiohttp.ContentTypeError:
+            return [{"status": "error", "message": "GPU server unavailable"} for _ in jobs]
+        except aiohttp.ClientError:
             return [{"status": "error", "message": "Connection error"} for _ in jobs]
+        except:
+            return [{"status": "error", "message": "Generation failed"} for _ in jobs]
         
         if not prompt_id:
             msg = response.get("error", {}).get("message", "Workflow rejected")
