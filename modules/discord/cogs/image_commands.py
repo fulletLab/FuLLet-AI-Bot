@@ -14,7 +14,8 @@ class ImageCommands(commands.Cog):
     @app_commands.command(name="imagine", description="Generate image")
     @app_commands.choices(model=[
         app_commands.Choice(name="Flux (Schnell)", value="flux"),
-        app_commands.Choice(name="Z-Image (Turbo)", value="z-image")
+        app_commands.Choice(name="Z-Image (Turbo)", value="z-image"),
+        app_commands.Choice(name="Anima", value="anima")
     ])
     async def imagine(self, interaction: discord.Interaction, model: str, prompt: str):
         await interaction.response.defer(ephemeral=True)

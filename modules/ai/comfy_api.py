@@ -68,7 +68,8 @@ async def process_image_batch(jobs):
     if not jobs: return []
     
     edit_jobs = [j for j in jobs if j.is_edit or j.input_image_bytes]
-    standard_jobs = [j for j in jobs if not j.is_edit and not j.input_image_bytes]
+    anima_jobs = [j for j in jobs if not j.is_edit and not j.input_image_bytes and getattr(j, 'model_type', 'flux') == 'anima']
+    standard_jobs = [j for j in jobs if not j.is_edit and not j.input_image_bytes and getattr(j, 'model_type', 'flux') != 'anima']
     
     results = [None] * len(jobs)
     
@@ -76,9 +77,14 @@ async def process_image_batch(jobs):
         std_results = await process_standard_batch(standard_jobs)
         std_idx = 0
         for i, job in enumerate(jobs):
-            if not job.is_edit and not job.input_image_bytes:
+            if not job.is_edit and not job.input_image_bytes and getattr(job, 'model_type', 'flux') != 'anima':
                 results[i] = std_results[std_idx]
                 std_idx += 1
+    
+    if anima_jobs:
+        for i, job in enumerate(jobs):
+            if not job.is_edit and not job.input_image_bytes and getattr(job, 'model_type', 'flux') == 'anima':
+                results[i] = await process_anima_job(job)
                 
     if edit_jobs:
         for i, job in enumerate(jobs):
@@ -86,6 +92,38 @@ async def process_image_batch(jobs):
                 results[i] = await process_single_edit_job(job)
                 
     return results
+
+async def process_anima_job(job):
+    gpu = await gpu_pool.wait_for_available_gpu("anima", timeout=120.0)
+    if not gpu: return {"status": "error", "message": "No GPU available"}
+    
+    await gpu_pool.reserve_gpu(gpu, "anima")
+    try:
+        workflow = load_workflow("anima.json")
+        
+        if "4" in workflow:
+            workflow["4"]["inputs"]["text"] = job.prompt
+        if "3" in workflow:
+            workflow["3"]["inputs"]["seed"] = random.randint(1, 10**15)
+            
+        response = await queue_prompt(workflow, gpu.url, gpu.api_key)
+        prompt_id = response.get("prompt_id")
+        if not prompt_id:
+            msg = response.get("error", {}).get("message", "Workflow rejected")
+            return {"status": "error", "message": msg}
+            
+        history_entry = await wait_for_image(prompt_id, gpu.url, gpu.api_key)
+        if history_entry:
+            outputs = history_entry.get("outputs", {})
+            if "10" in outputs and "images" in outputs["10"]:
+                img_data = outputs["10"]["images"][0]
+                img_bytes = await get_image(img_data["filename"], img_data["subfolder"], img_data["type"], gpu.url, gpu.api_key)
+                return {"status": "success", "image_bytes": img_bytes, "filename": img_data["filename"], "user_id": job.user_id}
+        return {"status": "error", "message": "Timeout or no output"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        await gpu_pool.release_gpu(gpu, "anima")
 
 async def process_single_edit_job(job):
     gpu = await gpu_pool.wait_for_available_gpu("flux", timeout=120.0)

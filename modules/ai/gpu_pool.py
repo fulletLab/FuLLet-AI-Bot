@@ -9,7 +9,8 @@ import time
 VRAM_REQUIREMENTS = {
     "flux": 4.0,
     "flux_edit": 5.0,
-    "z-image": 5.0
+    "z-image": 5.0,
+    "anima": 4.0
 }
 
 DEFAULT_VRAM_GB = 8.0
