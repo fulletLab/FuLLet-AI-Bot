@@ -94,12 +94,15 @@ async def process_image_batch(jobs):
     return results
 
 async def process_anima_job(job):
+    print(f"[ANIMA] Processing job: {job.prompt}")
     gpu = await gpu_pool.wait_for_available_gpu("anima", timeout=120.0)
     if not gpu: return {"status": "error", "message": "No GPU available"}
+    print(f"[ANIMA] GPU found: {gpu.url}")
     
     await gpu_pool.reserve_gpu(gpu, "anima")
     try:
         workflow = load_workflow("anima.json")
+        print(f"[ANIMA] Workflow loaded, sending to ComfyUI...")
         
         if "4" in workflow:
             workflow["4"]["inputs"]["text"] = job.prompt
