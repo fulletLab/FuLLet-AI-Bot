@@ -120,7 +120,6 @@ async def process_anima_job(job):
             
         print("[ANIMA] Sending to ComfyUI...")
         response = await queue_prompt(workflow, gpu.url, gpu.api_key)
-        
         prompt_id = response.get("prompt_id")
         if not prompt_id:
             msg = response.get("error", {}).get("message", "Workflow rejected")
